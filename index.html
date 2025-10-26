@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v17 - HORIZONTAL Floor Lock)</title>
+    <title>AR Tetris 3D (v18 - Visual Scanner Feedback)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -104,28 +104,24 @@
 </head>
 
 <body>
-    <!-- UI Elements -->
     <div id="message-box" class="ui-element">Move phone to scan floor</div>
     <div id="game-over-box" class="ui-element">GAME OVER</div>
     <div id="score-box" class="ui-element" style="display: none;">Score: 0</div>
 
-    <!-- The fancy AR button (icon removed) -->
     <button id="custom-ar-button">
         Launch AR
     </button>
     
-    <!-- HTML Audio Elements -->
     <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="/music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto" playsinline></audio>
 
-    <!-- JavaScript Libraries -->
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+                "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
             }
         }
     </script>
@@ -214,7 +210,7 @@
 
             // --- AR Button Setup ---
             const arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['hit-test', 'local-floor', 'plane-detection'], // Added plane-detection
+                requiredFeatures: ['hit-test', 'local-floor', 'plane-detection'],
                 optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
@@ -334,7 +330,9 @@
                 const screenWidth = window.innerWidth;
                 const touchTime = new Date().getTime() - touchStartTime;
 
-                if (touchTime < STRAFE_INTERVAL_MS) {
+                // Check for a quick tap
+                if (touchTime < STRAFE_INTERVAL_MS * 1.5) { // Allow slightly longer for tap vs hold
+                    // Check if tap was in the middle
                     if (touchStartX > screenWidth * 0.33 && touchStartX < screenWidth * 0.66) {
                         // Middle Tap (Rotate)
                         rotatePiece();
@@ -350,20 +348,28 @@
 
             window.addEventListener('resize', onWindowResize);
             
-            // --- New Scanner Mesh (10x10 square base) ---
+            // --- Scanner Mesh (10x10 square base) ---
             const gridGeo = new THREE.PlaneGeometry(
                 BOARD_WIDTH * BLOCK_SIZE, 
                 BOARD_WIDTH * BLOCK_SIZE, 
                 BOARD_WIDTH, 
                 BOARD_WIDTH 
             );
-            const gridMat = new THREE.MeshBasicMaterial({
-                color: 0x00FFFF, // Bright cyan
+            // --- FIX: Define blue and green materials ---
+            const blueGridMat = new THREE.MeshBasicMaterial({
+                color: 0x00FFFF, // Bright cyan (blue)
                 wireframe: true,
                 transparent: true,
                 opacity: 0.7
             });
-            const wireframeGrid = new THREE.Mesh(gridGeo, gridMat);
+            const greenGridMat = new THREE.MeshBasicMaterial({
+                color: 0x00FF00, // Bright green
+                wireframe: true,
+                transparent: true,
+                opacity: 0.8 // Slightly more opaque
+            });
+            
+            const wireframeGrid = new THREE.Mesh(gridGeo, blueGridMat); // Start with blue
             wireframeGrid.rotation.x = -Math.PI / 2; // Lay flat
             
             placementGrid = new THREE.Group();
@@ -432,39 +438,51 @@
                     return;
                 }
 
-                // --- FIX: New Horizontal Plane Scanning ---
+                // --- FIX: New Scanning Logic with Color Change ---
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (hitTestSource) {
                         const hitTestResults = frame.getHitTestResults(hitTestSource); 
                         
-                        // --- This is the new logic ---
                         let floorHit = null;
                         for (const hit of hitTestResults) {
-                            // The 'results' can include planes
                             const plane = hit.plane;
                             if (plane && plane.orientation === 'horizontal') {
                                 floorHit = hit;
-                                break; // Found a horizontal plane
+                                break; 
                             }
                         }
-                        // --- End of new logic ---
+
+                        const gridMesh = placementGrid.children[0]; // Get the actual mesh
 
                         if (floorHit) {
                             const referenceSpace = renderer.xr.getReferenceSpace();
                             const pose = floorHit.getPose(referenceSpace);
                             
-                            // 1. Get position AND orientation from hit test
-                            // The pose.transform.orientation already contains the flat rotation
+                            // Update position and orientation
                             placementGrid.matrix.fromArray(pose.transform.matrix);
-                            placementGrid.matrixAutoUpdate = false; // We set it directly
+                            placementGrid.matrixAutoUpdate = false; 
                             placementGrid.visible = true;
                             
+                            // --- State Change Logic ---
                             if (gameState === GAME_STATE.SCANNING) {
                                 gameState = GAME_STATE.PLACING;
                                 updateMessage("Tap screen to lock floor");
+                                // --- Change color to green and vibrate ---
+                                gridMesh.material = gridMesh.material.clone(); // Clone to avoid changing shared material
+                                gridMesh.material.color.setHex(0x00FF00); // Green
+                                triggerHaptic(50); // Vibrate
                             }
                         } else {
+                            // No floor hit
                             placementGrid.visible = false;
+                            // --- If we were placing, switch back to scanning ---
+                            if (gameState === GAME_STATE.PLACING) {
+                                gameState = GAME_STATE.SCANNING;
+                                updateMessage("Move phone to scan floor");
+                                // --- Change color back to blue ---
+                                gridMesh.material = gridMesh.material.clone();
+                                gridMesh.material.color.setHex(0x00FFFF); // Blue
+                            }
                         }
                     }
                 }
@@ -493,23 +511,14 @@
             scoreBox.style.display = 'block';
             updateScore(0);
             
-            // --- FIX: New Vertical Placement Logic ---
-            const depthOffset = -0.5; // Push 50cm "away" from user
-            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; // Lift board up by half its height
+            // --- Vertical Placement Logic ---
+            const depthOffset = -0.5; 
+            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
 
-            // 1. Copy the stable FLAT position from the placement grid
             gameBoard.applyMatrix4(placementGrid.matrix);
-            
-            // 2. Rotate it to stand up (local X axis)
             gameBoard.rotateX(-Math.PI / 2);
-            
-            // 3. Make it face the camera
             gameBoard.rotation.y = camera.rotation.y;
-            
-            // 4. Lift it so its base is on the floor (local Y is now "up")
             gameBoard.translateY(baseLift);
-            
-            // 5. Push it back from the camera (local Z is now "away")
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
@@ -824,5 +833,3 @@ function updateScore(linesCleared) {
         }
     </script></body>
 </html>
-
-

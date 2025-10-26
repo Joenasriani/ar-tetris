@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v11 - Major Fixes)</title>
+    <title>AR Tetris 3D (v12 - Final Fixes)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -26,6 +26,12 @@
             display: block;
             width: 100%;
             height: 100%;
+        }
+
+        /* --- FIX: Force-hide the default THREE.js AR button --- */
+        #default-ar-button {
+            display: none !important;
+            visibility: hidden !important;
         }
 
         /* Base style for all UI elements */
@@ -147,7 +153,6 @@
         let camera, scene, renderer;
         let hitTestSource = null;
         let placementGrid = null; 
-        // --- REMOVED scannerReticle ---
         let gameBoard = null; 
         let currentPiece = null;
         let gameLoopInterval = null;
@@ -166,10 +171,10 @@
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
 
-        // Game Logic (constants)
+        // --- FIX: Increased block size ---
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20;
-        const BLOCK_SIZE = 0.05; // 5cm
+        const BLOCK_SIZE = 0.08; // 8cm (was 0.05)
         
         let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
         
@@ -227,20 +232,17 @@
                 optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
-            // --- FIX: Hide the default button ---
-            arButton.style.display = 'none'; 
+            // --- FIX: Add ID to default button so CSS can hide it ---
+            arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
             // --- Custom Button Logic ---
             customArButton.addEventListener('click', () => {
                 console.log("Custom button clicked, triggering real AR button.");
                 
-                // --- FIX: Unlock all audio ---
+                // --- FIX: Call new audio unlock function ---
                 initAudioAndUnlock(); 
                 
-                if (bgmLoop.paused) {
-                    bgmLoop.play().catch(e => console.error("BGM play failed:", e));
-                }
                 arButton.click(); // Trigger the real AR startup
             });
 
@@ -248,6 +250,8 @@
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
                     if (!bgmLoop) initAudioAndUnlock(); // Failsafe
+                    
+                    // --- FIX: Play BGM *after* session starts ---
                     if (bgmLoop.paused) {
                         bgmLoop.play().catch(e => console.error("BGM play failed:", e));
                     }
@@ -271,10 +275,10 @@
                 window.location.reload();
             });
 
-            // --- Touch Controls ---
-            let touchDown, touchX, touchY, deltaX, deltaY, lastTap = 0;
-            const tapDelay = 300;
-            const moveThreshold = 50;
+            // --- FIX: New Tap-Zone Control Logic ---
+            let touchDown, touchX, touchY, lastTap = 0;
+            const tapDelay = 300; // For double tap
+            const tapMoveThreshold = 30; // Max pixels moved for it to be a "tap"
 
             function onTouchStart(e) {
                 if (gameState === GAME_STATE.PLACING) {
@@ -287,68 +291,71 @@
                 touchDown = true;
                 touchX = e.touches[0].pageX;
                 touchY = e.touches[0].pageY;
-                deltaX = 0;
-                deltaY = 0;
-            }
-
-            function onTouchMove(e) {
-                if (gameState !== GAME_STATE.PLAYING || !touchDown) return;
-                deltaX = e.touches[0].pageX - touchX;
-                deltaY = e.touches[0].pageY - touchY;
-
-                if (Math.abs(deltaX) > moveThreshold) {
-                    const direction = deltaX > 0 ? 1 : -1;
-                    if (isValidMove(currentPiece, { x: direction })) {
-                        currentPiece.userData.gridPos.x += direction;
-                        updatePiecePosition(currentPiece);
-                        triggerHaptic(20);
-                        playSound(moveSound);
-                    }
-                    touchX = e.touches[0].pageX;
-                    deltaX = 0; 
-                }
-                
-                if (deltaY > moveThreshold * 2) {
-                    hardDrop();
-                    touchY = e.touches[0].pageY;
-                    deltaY = 0;
-                }
             }
             
             function onTouchEnd(e) {
-                if (gameState !== GAME_STATE.PLAYING) return;
+                if (gameState !== GAME_STATE.PLAYING || !touchDown) return;
                 touchDown = false;
-                if (Math.abs(deltaX) < moveThreshold && Math.abs(deltaY) < moveThreshold) {
+
+                const touchEndX = e.changedTouches[0].pageX;
+                const touchEndY = e.changedTouches[0].pageY;
+                
+                const deltaX = touchEndX - touchX;
+                const deltaY = touchEndY - touchY;
+
+                // Check if it was a "tap" (minimal movement)
+                if (Math.abs(deltaX) < tapMoveThreshold && Math.abs(deltaY) < tapMoveThreshold) {
+                    const screenWidth = window.innerWidth;
                     const now = new Date().getTime();
+
+                    // 1. Check for double tap (hard drop)
                     if (now - lastTap < tapDelay) {
                         hardDrop();
+                        lastTap = 0; // Reset tap timer
                     } else {
-                        rotatePiece();
+                    // 2. Check for single tap zones
+                        if (touchEndX < screenWidth * 0.33) {
+                            // Left side
+                            movePiece(-1);
+                        } else if (touchEndX > screenWidth * 0.66) {
+                            // Right side
+                            movePiece(1);
+                        } else {
+                            // Middle
+                            rotatePiece();
+                        }
+                        lastTap = now; // Set tap timer for double tap
                     }
-                    lastTap = now;
                 }
             }
             
             renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
-            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
             renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
+            // --- REMOVED touchmove listener ---
 
             window.addEventListener('resize', onWindowResize);
             
-            // --- Scanner / Reticle Setup ---
-            // --- REMOVED scannerReticle ---
-            
-            const gridHelper = new THREE.GridHelper(BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH, 0x4169E1, 0x4169E1);
-            const gridHelper2 = new THREE.GridHelper(BOARD_HEIGHT * BLOCK_SIZE, BOARD_HEIGHT, 0x4169E1, 0x4169E1);
-            gridHelper.position.y = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
-            gridHelper2.position.x = (BOARD_WIDTH / 2) * BLOCK_SIZE; 
+            // --- FIX: New Bolder Mesh Scanner ---
+            const gridGeo = new THREE.PlaneGeometry(
+                BOARD_WIDTH * BLOCK_SIZE, 
+                BOARD_HEIGHT * BLOCK_SIZE, 
+                BOARD_WIDTH, 
+                BOARD_HEIGHT
+            );
+            const gridMat = new THREE.MeshBasicMaterial({
+                color: 0x00FFFF, // Bright cyan
+                wireframe: true,
+                transparent: true,
+                opacity: 0.7
+            });
+            const wireframeGrid = new THREE.Mesh(gridGeo, gridMat);
+            wireframeGrid.rotation.x = -Math.PI / 2; // Lay flat
             
             placementGrid = new THREE.Group();
-            placementGrid.add(gridHelper);
-            placementGrid.add(gridHelper2);
+            placementGrid.add(wireframeGrid);
             placementGrid.matrixAutoUpdate = false;
             placementGrid.visible = false;
-            // Center the grid origin
+            // Center the grid origin (relative to the plane itself)
             placementGrid.position.set(
                 (-BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE, 
                 (-BOARD_HEIGHT / 2 + 0.5) * BLOCK_SIZE, 
@@ -367,19 +374,16 @@
             
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
-            rotateSound = document.getElementById('audio-move'); 
+            rotateSound = document.getElementById('audio-move'); // Use same sound
             gameOverSound = document.getElementById('audio-gameover');
             lineClearSound = document.getElementById('audio-lineclear');
             
-            const sounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
+            const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound];
             
-            // This "unlocks" all sounds by playing and pausing them on the user's first tap
+            // Call .load() on all sounds. This is the correct way to "unlock".
             sounds.forEach(sound => {
                 if (sound) {
-                    sound.play().then(() => {
-                        sound.pause();
-                        sound.currentTime = 0;
-                    }).catch(e => console.warn("Audio unlock failed for a sound:", e));
+                    sound.load(); // <-- THE FIX
                 }
             });
 
@@ -395,7 +399,7 @@
         function playSound(audioElement) {
             if (!audioElement) return;
             audioElement.currentTime = 0; // Rewind to start
-            audioElement.play().catch(e => console.error("Sound play failed:", e));
+            audioElement.play().catch(e => console.warn("Sound play failed:", e)); // Use warn to avoid console spam
         }
 
         // --- Game Loop ---
@@ -455,12 +459,9 @@
             scoreBox.style.display = 'block';
             updateScore(0);
             
-            // --- FIX: Apply depth offset ---
             const depthOffset = -0.5; // Push 50cm "away" from user
 
-            // Lock the gameBoard to the placementGrid's position
             gameBoard.applyMatrix4(placementGrid.matrix);
-            // Apply the offset
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
@@ -513,6 +514,17 @@
             scoreBox.textContent = `Score: ${score}`;
         }
         
+        // --- FIX: New Move Piece function for tap controls ---
+        function movePiece(direction) { // -1 for left, 1 for right
+            if (!currentPiece) return;
+            if (isValidMove(currentPiece, { x: direction })) {
+                currentPiece.userData.gridPos.x += direction;
+                updatePiecePosition(currentPiece);
+                triggerHaptic(20);
+                playSound(moveSound);
+            }
+        }
+        
         function updatePiecePosition(piece) {
             const ud = piece.userData;
             piece.position.set(
@@ -562,7 +574,6 @@
 
             updatePiecePosition(piece);
 
-            // --- FIX: Add piece to gameBoard, not scene ---
             gameBoard.add(piece);
             currentPiece = piece;
             
@@ -713,7 +724,6 @@
                 }
             }
             
-            // --- FIX: Remove piece from gameBoard, not scene ---
             gameBoard.remove(currentPiece);
             currentPiece = null;
             
@@ -733,7 +743,6 @@
 
             if (linesCleared > 0) {
                 gameBoard.children = gameBoard.children.filter(block => {
-                    // Don't filter the currentPiece, only locked blocks
                     if (block === currentPiece) return true; 
                     
                     const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
@@ -746,7 +755,6 @@
                 }
                 
                 gameBoard.children.forEach(block => {
-                    // Don't move the currentPiece
                     if (block === currentPiece) return; 
 
                     const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
@@ -766,3 +774,5 @@
         }
     </script></body>
 </html>
+
+

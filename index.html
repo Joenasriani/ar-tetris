@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v12 - Final Fixes)</title>
+    <title>AR Tetris 3D (v13 - New Controls & Size)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -18,7 +18,8 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
             background-color: #111;
             color: white;
-            touch-action: manipulation;
+            /* CRITICAL: Prevents unwanted gestures */
+            touch-action: none; 
         }
 
         /* The 3D canvas */
@@ -47,6 +48,8 @@
             font-size: 1.2rem;
             font-weight: 500;
             z-index: 100;
+            /* Prevent touches from "falling through" to the canvas */
+            pointer-events: none; 
         }
 
         /* Message box at the top */
@@ -91,23 +94,15 @@
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
             cursor: pointer;
             z-index: 101;
-            /* display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px; */
             transition: all 0.3s ease;
+            /* Allow touches on this button */
+            pointer-events: auto; 
         }
 
         #custom-ar-button:hover {
             transform: translateX(-50%) scale(1.05);
             box-shadow: 0 8px 25px rgba(65, 105, 225, 0.7);
         }
-
-        /* #custom-ar-button svg {
-            width: 24px;
-            height: 24px;
-            fill: currentColor;
-        } */
     </style>
 </head>
 
@@ -119,21 +114,15 @@
 
     <!-- The fancy AR button -->
     <button id="custom-ar-button">
-        <!-- <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M19.7,3.3C17-0.9,12-1,9.3,3.3L3.3,9.3c-3.6,3.6-3.6,9.4,0,13.1C5,24,6.9,24,8.6,24s3.6-0.7,5-2l6.8-6.8l-1.9-1.9
-            l-6.8,6.8c-2.1,2.1-5.6,2.1-7.8,0c-2.1-2.1-2.1-5.6,0-7.8l6-6c2.1-2.1,5.6-2.1,7.8,0c1,1,1.6,2.4,1.6,3.8c0,0.3,0.2,0.5,0.5,0.5
-            s0.5-0.2,0.5-0.5C21.3,5.7,20.7,4.3,19.7,3.3z M20.7,14.7L14,21.4l1.9,1.9l6.8-6.8c2.1-2.1,2.1-5.6,0-7.8c-2.1-2.1-5.6-2.1-7.8,0
-            c-1,1-1.6,2.4-1.6,3.8c0,0.3-0.2,0.5-0.5,0.5S12.3,12.5,12.3,12.2c0-2.4,1-4.7,2.7-6.4c2.6-2.6,6.9-2.5,9.5,0.1
-            C28.2,9.6,24.4,18.4,20.7,14.7z"/>
-        </svg> -->
         Launch AR
     </button>
     
     <!-- HTML Audio Elements -->
-    <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto"></audio>
-    <audio id="audio-move" src="/music/tik.mp3" preload="auto"></audio>
-    <audio id="audio-gameover" src="/music/outro.mp3" preload="auto"></audio>
-    <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto"></audio>
+    <!-- FIX: Added playsinline for mobile compatibility -->
+    <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
+    <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-gameover" src="/music/outro.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto" playsinline></audio>
 
     <!-- JavaScript Libraries -->
     <script type="importmap">
@@ -171,10 +160,10 @@
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
 
-        // --- FIX: Increased block size ---
+        // --- FIX: Updated Board Size ---
         const BOARD_WIDTH = 10;
-        const BOARD_HEIGHT = 20;
-        const BLOCK_SIZE = 0.08; // 8cm (was 0.05)
+        const BOARD_HEIGHT = 40; // Was 20
+        const BLOCK_SIZE = 0.1; // Was 0.08
         
         let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
         
@@ -193,6 +182,7 @@
 
         // --- Audio Variables ---
         let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
+        let audioUnlocked = false;
 
         // --- Haptics ---
         function triggerHaptic(duration = 20) {
@@ -232,7 +222,6 @@
                 optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
-            // --- FIX: Add ID to default button so CSS can hide it ---
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
@@ -249,10 +238,10 @@
             // --- Listen for AR session start ---
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    if (!bgmLoop) initAudioAndUnlock(); // Failsafe
+                    if (!audioUnlocked) initAudioAndUnlock(); // Failsafe
                     
                     // --- FIX: Play BGM *after* session starts ---
-                    if (bgmLoop.paused) {
+                    if (bgmLoop && bgmLoop.paused) {
                         bgmLoop.play().catch(e => console.error("BGM play failed:", e));
                     }
                     
@@ -275,67 +264,111 @@
                 window.location.reload();
             });
 
-            // --- FIX: New Tap-Zone Control Logic ---
-            let touchDown, touchX, touchY, lastTap = 0;
-            const tapDelay = 300; // For double tap
-            const tapMoveThreshold = 30; // Max pixels moved for it to be a "tap"
+            // --- FIX: New Control Logic (Tap, Hold, Drag) ---
+            let touchStartX, touchStartY, touchStartTime;
+            let strafeInterval = null;
+            let isDragging = false;
+            const DRAG_THRESHOLD_Y = 75; // Pixels to drag down for hard drop
+            const STRAFE_INTERVAL_MS = 130; // How fast to move when holding
 
             function onTouchStart(e) {
+                // Prevent default browser actions (like zooming or scrolling)
+                e.preventDefault(); 
+                
                 if (gameState === GAME_STATE.PLACING) {
                     updateMessage("Starting Game...", true);
                     startGame();
                     return; 
                 }
 
-                if (gameState !== GAME_STATE.PLAYING) return;
-                touchDown = true;
-                touchX = e.touches[0].pageX;
-                touchY = e.touches[0].pageY;
+                if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) {
+                    // Ignore multi-touch
+                    return; 
+                }
+
+                // Clear any leftover timers
+                if (strafeInterval) clearInterval(strafeInterval);
+                
+                const touch = e.touches[0];
+                touchStartX = touch.pageX;
+                touchStartY = touch.pageY;
+                touchStartTime = new Date().getTime();
+                isDragging = false;
+
+                const screenWidth = window.innerWidth;
+                
+                if (touchStartX < screenWidth * 0.33) {
+                    // --- Left Side ---
+                    movePiece(-1); // Move once immediately
+                    // Start timer to keep moving
+                    strafeInterval = setInterval(() => movePiece(-1), STRAFE_INTERVAL_MS);
+                } else if (touchStartX > screenWidth * 0.66) {
+                    // --- Right Side ---
+                    movePiece(1); // Move once immediately
+                    // Start timer to keep moving
+                    strafeInterval = setInterval(() => movePiece(1), STRAFE_INTERVAL_MS);
+                } else {
+                    // --- Middle ---
+                    // Don't do anything yet, wait for touchend to confirm it's a "tap"
+                }
+            }
+            
+            function onTouchMove(e) {
+                e.preventDefault();
+                if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) {
+                    return;
+                }
+                
+                const touch = e.touches[0];
+                const deltaY = touch.pageY - touchStartY;
+                
+                // Check for drag down
+                if (deltaY > DRAG_THRESHOLD_Y) {
+                    // --- Drag Down (Hard Drop) ---
+                    if (strafeInterval) clearInterval(strafeInterval); // Stop strafing
+                    hardDrop();
+                    
+                    // Reset touch start points to prevent re-triggering
+                    touchStartY = null; 
+                    touchStartX = null;
+                    isDragging = true; // Flag that we've finished with a drag
+                }
             }
             
             function onTouchEnd(e) {
-                if (gameState !== GAME_STATE.PLAYING || !touchDown) return;
-                touchDown = false;
-
-                const touchEndX = e.changedTouches[0].pageX;
-                const touchEndY = e.changedTouches[0].pageY;
+                e.preventDefault();
+                if (gameState !== GAME_STATE.PLAYING) return;
                 
-                const deltaX = touchEndX - touchX;
-                const deltaY = touchEndY - touchY;
+                // Stop any "tap and hold" movement
+                if (strafeInterval) clearInterval(strafeInterval);
+                
+                // Check if we already handled this touch as a drag
+                if (isDragging) {
+                    isDragging = false;
+                    return;
+                }
+                
+                const screenWidth = window.innerWidth;
+                const touchTime = new Date().getTime() - touchStartTime;
 
-                // Check if it was a "tap" (minimal movement)
-                if (Math.abs(deltaX) < tapMoveThreshold && Math.abs(deltaY) < tapMoveThreshold) {
-                    const screenWidth = window.innerWidth;
-                    const now = new Date().getTime();
-
-                    // 1. Check for double tap (hard drop)
-                    if (now - lastTap < tapDelay) {
-                        hardDrop();
-                        lastTap = 0; // Reset tap timer
-                    } else {
-                    // 2. Check for single tap zones
-                        if (touchEndX < screenWidth * 0.33) {
-                            // Left side
-                            movePiece(-1);
-                        } else if (touchEndX > screenWidth * 0.66) {
-                            // Right side
-                            movePiece(1);
-                        } else {
-                            // Middle
-                            rotatePiece();
-                        }
-                        lastTap = now; // Set tap timer for double tap
+                // Check if it was a quick tap (not a hold) in the middle
+                if (touchTime < STRAFE_INTERVAL_MS) {
+                    if (touchStartX > screenWidth * 0.33 && touchStartX < screenWidth * 0.66) {
+                        // --- Middle Tap (Rotate) ---
+                        rotatePiece();
                     }
                 }
             }
             
             renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
             renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
-            // --- REMOVED touchmove listener ---
+            renderer.domElement.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
 
             window.addEventListener('resize', onWindowResize);
             
-            // --- FIX: New Bolder Mesh Scanner ---
+            // --- FIX: Bolder Mesh Scanner (using new size) ---
             const gridGeo = new THREE.PlaneGeometry(
                 BOARD_WIDTH * BLOCK_SIZE, 
                 BOARD_HEIGHT * BLOCK_SIZE, 
@@ -370,7 +403,9 @@
 
         // --- FIX: New Audio Init and Unlock Function ---
         function initAudioAndUnlock() {
-            if (bgmLoop) return; // Already initialized
+            if (audioUnlocked) return; // Already initialized
+            
+            console.log("Attempting to unlock audio...");
             
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
@@ -380,10 +415,21 @@
             
             const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound];
             
-            // Call .load() on all sounds. This is the correct way to "unlock".
+            // This is the most reliable way to "unlock" audio.
+            // We must call .play() and then immediately .pause()
+            // This must be in the same synchronous call stack as the user tap.
             sounds.forEach(sound => {
                 if (sound) {
-                    sound.load(); // <-- THE FIX
+                    const playPromise = sound.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            sound.pause();
+                            sound.currentTime = 0;
+                            console.log("Unlocked:", sound.id);
+                        }).catch(e => {
+                            console.warn("Could not unlock audio for:", sound.id, e);
+                        });
+                    }
                 }
             });
 
@@ -393,13 +439,15 @@
             rotateSound.volume = 0.8;
             gameOverSound.volume = 0.7;
             if(lineClearSound) lineClearSound.volume = 0.7;
+            
+            audioUnlocked = true;
         }
 
         // --- Helper function to play sounds ---
         function playSound(audioElement) {
-            if (!audioElement) return;
+            if (!audioElement || !audioUnlocked) return;
             audioElement.currentTime = 0; // Rewind to start
-            audioElement.play().catch(e => console.warn("Sound play failed:", e)); // Use warn to avoid console spam
+            audioElement.play().catch(e => console.warn("Sound play failed:", e)); 
         }
 
         // --- Game Loop ---
@@ -411,7 +459,7 @@
                     return;
                 }
 
-                // --- FIX: Simplified Scanning Logic (Mesh Only) ---
+                // --- Scanning Logic (Mesh Only) ---
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (hitTestSource) {
                         const hitTestResults = frame.getHitTestResults(hitTestSource);
@@ -493,7 +541,7 @@
             playSound(gameOverSound);
         }
 
-        function updateScore(linesCleared) {
+function updateScore(linesCleared) {
             const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
             if (linesCleared > 0) {
                 score += points[linesCleared] || 0;
@@ -508,13 +556,14 @@
                 flash.style.height = '100%';
                 flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
                 flash.style.zIndex = '999';
+                flash.style.pointerEvents = 'none'; // So it doesn't block controls
                 document.body.appendChild(flash);
                 setTimeout(() => document.body.removeChild(flash), 100);
             }
             scoreBox.textContent = `Score: ${score}`;
         }
         
-        // --- FIX: New Move Piece function for tap controls ---
+        // --- New Move Piece function for tap controls ---
         function movePiece(direction) { // -1 for left, 1 for right
             if (!currentPiece) return;
             if (isValidMove(currentPiece, { x: direction })) {
@@ -651,7 +700,7 @@
             gameLoopInterval = setInterval(gameTick, 1000);
             
             triggerHaptic(50);
-            playSound(moveSound);
+            playSound(moveSound); // Play 'tik' on hard drop
         }
 
         function isValidMove(piece, delta) {
@@ -671,10 +720,12 @@
                             return false;
                         }
                         
+                        // Check bottom boundary (new height)
                         if (boardY >= BOARD_HEIGHT) {
                             return false;
                         }
                         
+                        // Check collision with other blocks
                         if (boardY >= 0 && grid[boardY][boardX]) {
                             return false;
                         }
@@ -698,6 +749,7 @@
                         const boardX = gridX + x;
                         const boardY = gridY + y;
                         
+                        // Check top boundary (for game over)
                         if (boardY < 0 || boardY >= BOARD_HEIGHT) {
                             continue; 
                         }
@@ -742,18 +794,21 @@
             }
 
             if (linesCleared > 0) {
+                // Filter out blocks that are in the cleared rows
                 gameBoard.children = gameBoard.children.filter(block => {
-                    if (block === currentPiece) return true; 
+                    if (block === currentPiece) return true; // Don't remove current piece
                     
                     const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
                     return !rowsToClear.includes(blockY); 
                 });
                 
+                // Remove cleared rows from the logical grid
                 for (const y of rowsToClear.sort((a, b) => a - b)) { 
                     grid.splice(y, 1);
                     grid.unshift(Array(BOARD_WIDTH).fill(0));
                 }
                 
+                // Shift down remaining blocks
                 gameBoard.children.forEach(block => {
                     if (block === currentPiece) return; 
 
@@ -774,6 +829,5 @@
         }
     </script></body>
 </html>
-
 
 

@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v9 - Line Clear SFX)</title>
+    <title>AR Tetris 3D (v10 - Logic Rebuilt)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -106,8 +106,6 @@
 </head>
 
 <body>
-    <!-- 3D content will be rendered here -->
-
     <!-- UI Elements -->
     <div id="message-box" class="ui-element">Move phone to scan floor</div>
     <div id="game-over-box" class="ui-element">GAME OVER</div>
@@ -125,19 +123,13 @@
         Launch AR
     </button>
     
-    <!-- 
-      HTML Audio Elements
-    -->
+    <!-- HTML Audio Elements -->
     <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto"></audio>
     <audio id="audio-move" src="/music/tik.mp3" preload="auto"></audio>
     <audio id="audio-gameover" src="/music/outro.mp3" preload="auto"></audio>
-    <!-- NEW: Added line clear sound -->
     <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto"></audio>
 
-
-    <!-- 
-      JavaScript Libraries
-    -->
+    <!-- JavaScript Libraries -->
     <script type="importmap">
         {
             "imports": {
@@ -147,7 +139,6 @@
         }
     </script>
     
-
     <script type="module">
         import * as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
@@ -179,16 +170,25 @@
         // Game Logic (constants)
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20;
-        const BOARD_DEPTH = 1;
-        const BLOCK_SIZE = 0.05;
+        const BLOCK_SIZE = 0.05; // 5cm
+        
+        // This is the "single source of truth" for game logic
         let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+        
         const SHAPES = [
+            // I (y-coords 0, 1, 2, 3)
             [[[1,1,1,1]], [[1],[1],[1],[1]]],
+            // O (y-coords 0, 1)
             [[[1,1],[1,1]]],
+            // T (y-coords 0, 1)
             [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]],
+            // S (y-coords 0, 1)
             [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]],
+            // Z (y-coords 0, 1)
             [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]],
+            // J (y-coords 0, 1)
             [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]],
+            // L (y-coords 0, 1)
             [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]
         ];
         const COLORS = {
@@ -196,7 +196,6 @@
         };
 
         // --- Audio Variables ---
-        // NEW: Added lineClearSound
         let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
 
         // --- Haptics ---
@@ -237,30 +236,23 @@
                 optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
-            arButton.style.display = 'none';
+            arButton.style.display = 'none'; // Hide the default button
             document.body.appendChild(arButton);
 
-            // --- Custom Button Logic for MP3s ---
+            // --- Custom Button Logic ---
             customArButton.addEventListener('click', () => {
                 console.log("Custom button clicked, triggering real AR button.");
-                
-                // Manually initialize audio on first user tap
-                initAudio();
-                
-                // Start BGM
+                initAudio(); // Init audio on first user gesture
                 if (bgmLoop.paused) {
                     bgmLoop.play().catch(e => console.error("BGM play failed:", e));
                 }
-                
-                arButton.click();
+                arButton.click(); // Trigger the real AR startup
             });
 
             // --- Listen for AR session start ---
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    
                     if (!bgmLoop) initAudio(); // Failsafe
-                    
                     if (bgmLoop.paused) {
                         bgmLoop.play().catch(e => console.error("BGM play failed:", e));
                     }
@@ -269,6 +261,7 @@
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Move phone to scan floor");
 
+                    // Get hit test source
                     const currentSession = renderer.xr.getSession();
                     currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
                         currentSession.requestHitTestSource({ space: referenceSpace }).then((source) => {
@@ -283,22 +276,16 @@
                 window.location.reload();
             });
 
-            // Controller Setup
-            controller = renderer.xr.getController(0);
-            scene.add(controller);
-
-            // Touch Controls
+            // --- Touch Controls ---
             let touchDown, touchX, touchY, deltaX, deltaY, lastTap = 0;
             const tapDelay = 300;
             const moveThreshold = 50;
 
             function onTouchStart(e) {
-                // --- MODIFIED: Added check for placing ---
                 if (gameState === GAME_STATE.PLACING) {
-                    // This is the tap to lock the floor
                     updateMessage("Starting Game...", true);
                     startGame();
-                    return; // Don't process other game input
+                    return; 
                 }
 
                 if (gameState !== GAME_STATE.PLAYING) return;
@@ -313,18 +300,26 @@
                 if (gameState !== GAME_STATE.PLAYING || !touchDown) return;
                 deltaX = e.touches[0].pageX - touchX;
                 deltaY = e.touches[0].pageY - touchY;
+
+                // Horizontal swipe (left/right)
                 if (Math.abs(deltaX) > moveThreshold) {
                     const direction = deltaX > 0 ? 1 : -1;
+                    // --- NEW LOGIC ---
                     if (isValidMove(currentPiece, { x: direction })) {
-                        currentPiece.position.x += direction * BLOCK_SIZE;
+                        currentPiece.userData.gridPos.x += direction;
+                        updatePiecePosition(currentPiece);
                         triggerHaptic(20);
                         playSound(moveSound);
                     }
+                    // Reset touch start
                     touchX = e.touches[0].pageX;
                     deltaX = 0; 
                 }
+                
+                // Vertical swipe (down)
                 if (deltaY > moveThreshold * 2) {
                     hardDrop();
+                    // Reset touch start
                     touchY = e.touches[0].pageY;
                     deltaY = 0;
                 }
@@ -333,6 +328,7 @@
             function onTouchEnd(e) {
                 if (gameState !== GAME_STATE.PLAYING) return;
                 touchDown = false;
+                // Check for tap (no significant move)
                 if (Math.abs(deltaX) < moveThreshold && Math.abs(deltaY) < moveThreshold) {
                     const now = new Date().getTime();
                     if (now - lastTap < tapDelay) {
@@ -350,7 +346,7 @@
 
             window.addEventListener('resize', onWindowResize);
             
-            // Scanner / Reticle Setup
+            // --- Scanner / Reticle Setup ---
             scannerReticle = new THREE.Mesh(
                 new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2),
                 new THREE.MeshBasicMaterial({ color: 0x4169E1, opacity: 0.7, transparent: true })
@@ -360,15 +356,24 @@
             scene.add(scannerReticle);
             
             const gridHelper = new THREE.GridHelper(BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH, 0x4169E1, 0x4169E1);
-            gridHelper.rotation.x = -Math.PI / 2;
             const gridHelper2 = new THREE.GridHelper(BOARD_HEIGHT * BLOCK_SIZE, BOARD_HEIGHT, 0x4169E1, 0x4169E1);
+            gridHelper.position.y = (BOARD_HEIGHT / 2) * BLOCK_SIZE; // Move to top
+            gridHelper2.position.x = (BOARD_WIDTH / 2) * BLOCK_SIZE; // Move to side
+            
             placementGrid = new THREE.Group();
             placementGrid.add(gridHelper);
             placementGrid.add(gridHelper2);
             placementGrid.matrixAutoUpdate = false;
             placementGrid.visible = false;
+            // Center the grid origin
+            placementGrid.position.set(
+                (-BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE, 
+                (-BOARD_HEIGHT / 2 + 0.5) * BLOCK_SIZE, 
+                0
+            );
             scene.add(placementGrid);
             
+            // This group holds all *locked* blocks
             gameBoard = new THREE.Group();
             
             renderer.setAnimationLoop(animate);
@@ -376,14 +381,13 @@
 
         // --- Audio Init for MP3s ---
         function initAudio() {
+            if (bgmLoop) return; // Already initialized
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
             rotateSound = document.getElementById('audio-move'); 
             gameOverSound = document.getElementById('audio-gameover');
-            // NEW: Get the line clear sound element
             lineClearSound = document.getElementById('audio-lineclear');
             
-            // Set volume
             bgmLoop.volume = 0.3;
             moveSound.volume = 0.8;
             rotateSound.volume = 0.8;
@@ -407,6 +411,7 @@
                     return;
                 }
 
+                // Logic for scanning and placing
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (hitTestSource) {
                         const hitTestResults = frame.getHitTestResults(hitTestSource);
@@ -415,6 +420,7 @@
                             const referenceSpace = renderer.xr.getReferenceSpace();
                             const pose = hit.getPose(referenceSpace);
                             
+                            // Show the MESH grid
                             placementGrid.matrix.fromArray(pose.transform.matrix);
                             placementGrid.visible = true;
                             scannerReticle.visible = false;
@@ -424,6 +430,7 @@
                                 updateMessage("Tap screen to lock floor");
                             }
                         } else {
+                            // No hit, show the RING reticle
                             placementGrid.visible = false;
                             scannerReticle.visible = true;
                             const pose = frame.getViewerPose(renderer.xr.getReferenceSpace());
@@ -461,19 +468,28 @@
             gameState = GAME_STATE.PLAYING;
             scoreBox.style.display = 'block';
             updateScore(0);
+            
+            // Lock the gameBoard to the placementGrid's position
             gameBoard.applyMatrix4(placementGrid.matrix);
             scene.add(gameBoard);
+            
             placementGrid.visible = false;
             scannerReticle.visible = false;
+            
             spawnPiece();
             gameLoopInterval = setInterval(gameTick, 1000);
         }
 
+        // --- NEW: Rebuilt Game Tick ---
         function gameTick() {
             if (!currentPiece) return;
-            if (isValidMove(currentPiece, { y: -1 })) {
-                currentPiece.position.y -= BLOCK_SIZE;
+
+            if (isValidMove(currentPiece, { y: 1 })) {
+                // Move down logically
+                currentPiece.userData.gridPos.y += 1;
+                updatePiecePosition(currentPiece);
             } else {
+                // Landed
                 lockPiece();
                 spawnPiece();
             }
@@ -492,8 +508,6 @@
             const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
             if (linesCleared > 0) {
                 score += points[linesCleared] || 0;
-                
-                // --- NEW: Play line clear sound ---
                 playSound(lineClearSound);
                 
                 // Line Clear Flash Effect
@@ -510,11 +524,22 @@
             }
             scoreBox.textContent = `Score: ${score}`;
         }
+        
+        // --- NEW: Helper to sync 3D pos from logical pos ---
+        function updatePiecePosition(piece) {
+            const ud = piece.userData;
+            // Y-axis is inverted: gridY 0 is at the top, so 3D y is high.
+            piece.position.set(
+                (ud.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
+                (BOARD_HEIGHT / 2 - 0.5 - ud.gridPos.y) * BLOCK_SIZE,
+                0
+            );
+        }
 
-        // --- Piece Spawning and Logic ---
+        // --- NEW: Rebuilt Piece Spawning ---
         function spawnPiece() {
             const typeIndex = Math.floor(Math.random() * SHAPES.length);
-            const rotationIndex = Math.floor(Math.random() * SHAPES[typeIndex].length);
+            const rotationIndex = 0; // Always spawn in default rotation
             const shape = SHAPES[typeIndex][rotationIndex];
             const color = COLORS[typeIndex + 1];
             
@@ -524,11 +549,13 @@
                 typeIndex: typeIndex,
                 rotationIndex: rotationIndex,
                 gridPos: {
+                    // Start at top-middle
                     x: Math.floor((BOARD_WIDTH - shape[0].length) / 2),
-                    y: BOARD_HEIGHT + 2 
+                    y: 0 // Logical Y starts at 0 (top)
                 }
             };
-
+            
+            // Create blocks
             const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
             const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
             const bevelGeo = new THREE.EdgesGeometry(blockGeo);
@@ -540,42 +567,32 @@
                         const block = new THREE.Mesh(blockGeo, blockMat);
                         const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
                         block.add(bevel);
-                        block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
+                        // Position relative to the piece's group origin
+                        block.position.set(
+                            x * BLOCK_SIZE,
+                            -y * BLOCK_SIZE, // y is inverted in shape array
+                            0
+                        );
                         piece.add(block);
                     }
                 }
             }
 
-            piece.position.set(
-                (piece.userData.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
-                (piece.userData.gridPos.y - BOARD_HEIGHT / 2 + 0.5) * BLOCK_SIZE,
-                0
-            );
+            // Set initial 3D position based on logical grid position
+            updatePiecePosition(piece);
 
-            const startY = piece.position.y;
-            const endY = (BOARD_HEIGHT / 2 - 0.5) * BLOCK_SIZE;
-            let dropTime = 0;
-
-            function dropAnimation() {
-                dropTime += 0.05;
-                const newY = THREE.MathUtils.lerp(startY, endY, dropTime);
-                piece.position.y = newY;
-                
-                if (dropTime < 1) {
-                    requestAnimationFrame(dropAnimation);
-                } else {
-                    piece.position.y = endY;
-                    if (!isValidMove(piece, { y: 0 })) {
-                        gameOver();
-                    }
-                }
-            }
-
+            // Add to scene (not gameBoard, gameBoard is for locked pieces)
             scene.add(piece);
             currentPiece = piece;
-            dropAnimation();
+            
+            // --- NEW: Game Over Check ---
+            // Check if the spawn location is valid. If not, game over.
+            if (!isValidMove(currentPiece, {})) {
+                gameOver();
+            }
         }
         
+        // --- NEW: Rebuilt Rotate ---
         function rotatePiece() {
             if (!currentPiece) return;
             
@@ -583,15 +600,22 @@
             const newRotationIndex = (ud.rotationIndex + 1) % SHAPES[ud.typeIndex].length;
             const newShape = SHAPES[ud.typeIndex][newRotationIndex];
             
+            // Test kicks
             const kicks = [0, 1, -1, 2, -2]; 
             for (const kick of kicks) {
-                const testPos = { x: ud.gridPos.x + kick, y: ud.gridPos.y };
+                const testPos = { 
+                    x: ud.gridPos.x + kick, 
+                    y: ud.gridPos.y // y doesn't kick
+                };
 
+                // Check if this new shape at this new position is valid
                 if (isValidMove(currentPiece, { shape: newShape, pos: testPos })) {
+                    // It's valid! Apply the rotation.
                     ud.rotationIndex = newRotationIndex;
                     ud.shape = newShape;
-                    ud.gridPos.x += kick;
+                    ud.gridPos.x = testPos.x; // Apply the kick
                     
+                    // Re-create the visual blocks
                     while (currentPiece.children.length) {
                         currentPiece.remove(currentPiece.children[0]);
                     }
@@ -607,34 +631,44 @@
                                 const block = new THREE.Mesh(blockGeo, blockMat);
                                 const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
                                 block.add(bevel);
-                                block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
+                                block.position.set(
+                                    x * BLOCK_SIZE,
+                                    -y * BLOCK_SIZE,
+                                    0
+                                );
                                 currentPiece.add(block);
                             }
                         }
                     }
                     
-                    currentPiece.position.x = (ud.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE;
+                    // Update 3D position from new logical position
+                    updatePiecePosition(currentPiece);
                     
                     triggerHaptic(30);
                     playSound(rotateSound);
-                    return; 
+                    return; // Rotation successful
                 }
             }
+            // No kicks worked
         }
         
+        // --- NEW: Rebuilt Hard Drop ---
         function hardDrop() {
             if (!currentPiece) return;
             
-            let dropAmount = 0;
-            while (isValidMove(currentPiece, { y: -(dropAmount + 1) })) {
-                dropAmount++;
+            // Find lowest valid logical Y position
+            while (isValidMove(currentPiece, { y: 1 })) {
+                currentPiece.userData.gridPos.y += 1;
             }
             
-            currentPiece.position.y -= dropAmount * BLOCK_SIZE;
+            // Snap 3D position to this final spot
+            updatePiecePosition(currentPiece);
             
+            // Lock and spawn next
             lockPiece();
             spawnPiece();
             
+            // Reset game tick
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, 1000);
             
@@ -642,113 +676,136 @@
             playSound(moveSound);
         }
 
-        // --- Collision and Grid Logic ---
+        // --- NEW: Rebuilt Collision Logic ---
         function isValidMove(piece, delta) {
             const ud = piece.userData;
             const shape = delta.shape || ud.shape;
+            
+            // Get test position
             const newGridX = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
             const newGridY = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
 
             for (let y = 0; y < shape.length; y++) {
                 for (let x = 0; x < shape[y].length; x++) {
+                    // If this is a block in the shape
                     if (shape[y][x]) {
+                        // Calculate its potential position on the main grid
                         const boardX = newGridX + x;
-                        const boardY = newGridY - y + (BOARD_HEIGHT - (piece.position.y / BLOCK_SIZE + BOARD_HEIGHT / 2 - 0.5));
-                        if (boardX < 0 || boardX >= BOARD_WIDTH) return false;
-                        if (boardY >= BOARD_HEIGHT) return false;
-                        if (boardY >= 0 && grid[boardY][boardX]) return false;
+                        const boardY = newGridY + y; // y is 0,1,2,3...
+
+                        // 1. Check walls
+                        if (boardX < 0 || boardX >= BOARD_WIDTH) {
+                            return false;
+                        }
+                        
+                        // 2. Check floor
+                        if (boardY >= BOARD_HEIGHT) {
+                            return false;
+                        }
+                        
+                        // 3. Check other blocks (only if within bounds)
+                        if (boardY >= 0 && grid[boardY][boardX]) {
+                            return false;
+                        }
                     }
                 }
             }
+            // All checks passed
             return true;
         }
 
+        // --- NEW: Rebuilt Lock Piece ---
         function lockPiece() {
             if (!currentPiece) return;
             
             const ud = currentPiece.userData;
             const shape = ud.shape;
             const gridX = ud.gridPos.x;
-            const gridY = Math.round(BOARD_HEIGHT - (currentPiece.position.y / BLOCK_SIZE + BOARD_HEIGHT / 2 - 0.5));
+            const gridY = ud.gridPos.y; // This is the final, correct logical Y
             
             for (let y = 0; y < shape.length; y++) {
                 for (let x = 0; x < shape[y].length; x++) {
                     if (shape[y][x]) {
                         const boardX = gridX + x;
-                        const boardY = gridY - y;
+                        const boardY = gridY + y;
                         
-                        if (boardY < 0) {
-                            gameOver();
-                            return;
+                        // This should be impossible if isValidMove is correct
+                        // but good to check
+                        if (boardY < 0 || boardY >= BOARD_HEIGHT) {
+                            continue; 
                         }
                         
+                        // Add to collision grid
                         grid[boardY][boardX] = ud.typeIndex + 1;
                         
-                        const block = currentPiece.children.find(child => 
-                            Math.abs(child.position.x - x * BLOCK_SIZE) < 0.01 &&
-                            Math.abs(child.position.y - (-y * BLOCK_SIZE)) < 0.01
-                        );
+                        // Create a new, stationary block and add it to the gameBoard
+                        const color = COLORS[ud.typeIndex + 1];
+                        const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+                        const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+                        const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+                        const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
+                        const newBlock = new THREE.Mesh(blockGeo, blockMat);
+                        const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                        newBlock.add(newBevel);
                         
-                        if (block) {
-                            const worldPos = new THREE.Vector3();
-                            block.getWorldPosition(worldPos);
-                            gameBoard.worldToLocal(worldPos);
-                            
-                            const color = COLORS[ud.typeIndex + 1];
-                            const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-                            const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-                            const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-                            const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-                
-                            const newBlock = new THREE.Mesh(blockGeo, blockMat);
-                            const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                            newBlock.add(newBevel);
-                            
-                            newBlock.position.copy(worldPos);
-                            newBlock.rotation.copy(currentPiece.rotation);
-                            gameBoard.add(newBlock);
-                        }
+                        // Set its position *in gameBoard's local space*
+                        newBlock.position.set(
+                            (boardX - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
+                            (BOARD_HEIGHT / 2 - 0.5 - boardY) * BLOCK_SIZE,
+                            0
+                        );
+                        gameBoard.add(newBlock);
                     }
                 }
             }
             
+            // Remove the moving piece
             scene.remove(currentPiece);
             currentPiece = null;
+            
             checkLineClears();
         }
 
+        // --- NEW: Rebuilt Line Clear ---
         function checkLineClears() {
             let linesCleared = 0;
             let rowsToClear = [];
             
+            // Check from bottom-up
             for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
                 if (grid[y].every(cell => cell > 0)) {
+                    // Full row!
                     linesCleared++;
                     rowsToClear.push(y);
-                    gameBoard.children = gameBoard.children.filter(block => {
-                        const blockY = Math.round(BOARD_HEIGHT - (block.position.y / BLOCK_SIZE + BOARD_HEIGHT / 2 - 0.5));
-                        return blockY !== y;
-                    });
                 }
             }
 
             if (linesCleared > 0) {
-                for (const y of rowsToClear) {
+                // Filter the 3D blocks
+                gameBoard.children = gameBoard.children.filter(block => {
+                    // Calculate logical Y from 3D Y
+                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                    return !rowsToClear.includes(blockY); // Keep if NOT in cleared rows
+                });
+                
+                // Remove cleared rows from grid and add new ones at top
+                for (const y of rowsToClear.sort((a, b) => a - b)) { // Sort to remove from bottom-up
                     grid.splice(y, 1);
-                }
-                for (let i = 0; i < linesCleared; i++) {
                     grid.unshift(Array(BOARD_WIDTH).fill(0));
                 }
                 
+                // Shift down all remaining 3D blocks
                 gameBoard.children.forEach(block => {
-                    let blockY = Math.round(BOARD_HEIGHT - (block.position.y / BLOCK_SIZE + BOARD_HEIGHT / 2 - 0.5));
+                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
                     let shift = 0;
                     for (const clearedY of rowsToClear) {
-                        if (blockY < clearedY) {
+                        if (blockY < clearedY) { // If block was above a cleared line
                             shift++;
                         }
                     }
                     if (shift > 0) {
+                        // Move down in 3D space
                         block.position.y -= shift * BLOCK_SIZE;
                     }
                 });
@@ -756,8 +813,7 @@
                 updateScore(linesCleared);
             }
         }
-    </script>
-</body>
+    </script></body>
 </html>
 
 

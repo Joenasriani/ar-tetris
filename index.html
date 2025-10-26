@@ -1,209 +1,809 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Hangman</title>
+    <title>AR Tetris 3D (v14 - Vertical Board)</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="xr-spatial-tracking" content="true">
+    
     <style>
-        body {
+        /* Basic reset */
+        body, html {
+            width: 100%;
+            height: 100%;
             margin: 0;
+            padding: 0;
             overflow: hidden;
-            font-family: 'Arial', sans-serif;
-            background-color: #f0f0f0;
-        }
-        #ar-button {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            padding: 12px 24px;
-            font-size: 18px;
-            background: #4CAF50;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #111;
             color: white;
-            border: none;
-            border-radius: 8px;
-            z-index: 100;
-            cursor: pointer;
+            touch-action: none; 
         }
-        #ui {
+
+        /* The 3D canvas */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- FIX: Force-hide the default THREE.js AR button --- */
+        #default-ar-button {
+            display: none !important;
+            visibility: hidden !important;
+        }
+
+        /* Base style for all UI elements */
+        .ui-element {
             position: absolute;
-            top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            padding: 16px 24px;
-            border-radius: 12px;
-            color: white;
+            padding: 12px 24px;
+            background-color: rgba(0, 0, 0, 0.6);
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
-            font-family: 'Courier New', monospace;
-            z-index: 10;
-            min-width: 80%;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-        }
-        #word-display {
-            font-size: 28px;
-            letter-spacing: 8px;
-            margin-bottom: 8px;
-            color: #00ff00;
-        }
-        #hangman {
-            font-size: 24px;
-            color: #ff5555;
-            height: 60px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        #restart-button {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 16px;
-            background: #f44336;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
+            font-size: 1.2rem;
+            font-weight: 500;
             z-index: 100;
+            pointer-events: none; 
         }
-        #message {
-            margin-top: 8px;
-            font-size: 18px;
-            color: #00ff00;
+
+        /* Message box at the top */
+        #message-box {
+            top: 30px;
+            display: none; /* Hidden by default */
+        }
+        
+        /* Game Over message */
+        #game-over-box {
+            top: 50%;
+            transform: translate(-50%, -50%);
+            color: #FF4136; /* Red */
+            font-size: 2rem;
+            font-weight: bold;
+            display: none; /* Hidden by default */
+        }
+
+        /* Score box at the top left */
+        #score-box {
+            top: 30px;
+            left: 30px;
+            transform: none; /* Override absolute center */
+            color: #FFDC00; /* Gold */
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Custom AR Button */
+        #custom-ar-button {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 18px 30px;
+            border-radius: 50px;
+            background: linear-gradient(145deg, #8a2be2, #4169e1);
+            color: white;
+            font-size: 1.3rem;
+            font-weight: 600;
+            border: none;
+            box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
+            cursor: pointer;
+            z-index: 101;
+            transition: all 0.3s ease;
+            pointer-events: auto; 
+        }
+
+        #custom-ar-button:hover {
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 8px 25px rgba(65, 105, 225, 0.7);
         }
     </style>
 </head>
+
 <body>
-    <button id="ar-button">Start AR</button>
-    <button id="restart-button">Restart</button>
-    <div id="ui">
-        <div id="word-display"></div>
-        <div id="hangman"></div>
-        <div id="message"></div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/webxr/ARButton.js"></script>
-    <script>
-        // --- Game State ---
-        const words = [
-            "THREE", "WEBXR", "HANGMAN", "JAVASCRIPT", "DEVELOPER",
-            "AUGMENTED", "REALITY", "GAME", "CREATIVE", "INTERACTIVE",
-            "PROGRAMMING", "FUN", "LEARNING", "CHALLENGE", "INNOVATION"
+    <div id="message-box" class="ui-element">Move phone to scan floor</div>
+    <div id="game-over-box" class="ui-element">GAME OVER</div>
+    <div id="score-box" class="ui-element" style="display: none;">Score: 0</div>
+
+    <button id="custom-ar-button">
+        Launch AR
+    </button>
+    
+    <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
+    <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-gameover" src="/music/outro.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto" playsinline></audio>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        
+        // --- Global Variables ---
+        let camera, scene, renderer;
+        let hitTestSource = null;
+        let placementGrid = null; 
+        let gameBoard = null; 
+        let currentPiece = null;
+        let gameLoopInterval = null;
+        
+        // UI Elements
+        let customArButton, messageBox, scoreBox, gameOverBox;
+        
+        // Game state
+        const GAME_STATE = {
+            INITIALIZING: 0,
+            SCANNING: 1,
+            PLACING: 2,
+            PLAYING: 3,
+            GAME_OVER: 4
+        };
+        let gameState = GAME_STATE.INITIALIZING;
+        let score = 0;
+
+        // --- FIX: Board Size ---
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20; // Back to 20 for standard vertical game
+        const BLOCK_SIZE = 0.1; // 10cm blocks
+        
+        let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+        
+        const SHAPES = [
+            [[[1,1,1,1]], [[1],[1],[1],[1]]],
+            [[[1,1],[1,1]]],
+            [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]],
+            [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]],
+            [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]],
+            [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]],
+            [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]
         ];
-        let hiddenWord = words[Math.floor(Math.random() * words.length)];
-        let guessedLetters = [];
-        let wrongGuesses = 0;
-        let letters = [];
-        const maxWrongGuesses = 6;
+        const COLORS = {
+            1: 0x00F0F0, 2: 0xF0F000, 3: 0xA000F0, 4: 0x00F000, 5: 0xF00000, 6: 0x0000F0, 7: 0xF0A000,
+        };
 
-        // --- Three.js Setup ---
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true;
-        document.body.appendChild(renderer.domElement);
-        document.body.appendChild(ARButton.createButton(renderer));
+        // --- Audio Variables ---
+        let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
+        let audioUnlocked = false;
 
-        // --- AR Lighting ---
-        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-        light.position.set(0.5, 1, 0.25);
-        scene.add(light);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(0, 1, 0);
-        scene.add(directionalLight);
-
-        // --- Create Retro Letters ---
-        function createLetter(char, x, y, z) {
-            const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.02);
-            const material = new THREE.MeshStandardMaterial({ color: 0x00ff00, metalness: 0.5, roughness: 0.5 });
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.position.set(x, y, z);
-            mesh.userData = { char };
-            scene.add(mesh);
-            return mesh;
-        }
-
-        // --- Place Letters in a Grid ---
-        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        alphabet.split('').forEach((char, i) => {
-            const x = (i % 5) * 0.2 - 0.4;
-            const y = Math.floor(i / 5) * -0.2 - 0.2;
-            letters.push(createLetter(char, x, y, -1));
-        });
-
-        // --- UI Updates ---
-        function updateWordDisplay() {
-            const display = hiddenWord.split('').map(c => guessedLetters.includes(c) ? c : '_').join(' ');
-            document.getElementById('word-display').textContent = display;
-            if (!display.includes('_')) {
-                document.getElementById('message').textContent = "You Win!";
+        // --- Haptics ---
+        function triggerHaptic(duration = 20) {
+            if (navigator.vibrate) {
+                navigator.vibrate(duration);
             }
         }
+        
+        // --- Init Functions ---
+        init();
 
-        function updateHangman() {
-            const hangmanParts = ['(˙˙)', '|', '/', '\\', '|', '/', '\\'];
-            document.getElementById('hangman').textContent = hangmanParts.slice(0, wrongGuesses).join(' ');
-            if (wrongGuesses >= maxWrongGuesses) {
-                document.getElementById('message').textContent = `Game Over! Word was: ${hiddenWord}`;
-            }
-        }
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-        // --- Raycasting for Shooting ---
-        const raycaster = new THREE.Raycaster();
-        const controller = renderer.xr.getController(0);
-        controller.addEventListener('select', () => {
-            raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-            raycaster.ray.direction.set(0, 0, -1).transformDirection(controller.matrixWorld);
-            const intersects = raycaster.intersectObjects(letters);
-            if (intersects.length > 0) {
-                const letter = intersects[0].object;
-                const char = letter.userData.char;
-                if (!guessedLetters.includes(char)) {
-                    guessedLetters.push(char);
-                    if (!hiddenWord.includes(char)) wrongGuesses++;
-                    updateWordDisplay();
-                    updateHangman();
-                    letter.material.color.set(0xff0000);
-                    setTimeout(() => scene.remove(letter), 500);
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+            light.position.set(0.5, 1, 0.25);
+            scene.add(light);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+            directionalLight.position.set(0, 10, 0);
+            scene.add(directionalLight);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            
+            customArButton = document.getElementById('custom-ar-button');
+            messageBox = document.getElementById('message-box');
+            scoreBox = document.getElementById('score-box');
+            gameOverBox = document.getElementById('game-over-box');
+
+            // --- AR Button Setup ---
+            const arButton = ARButton.createButton(renderer, {
+                requiredFeatures: ['hit-test', 'local-floor'],
+                optionalFeatures: ['dom-overlay'],
+                domOverlay: { root: document.body }
+            });
+            arButton.id = "default-ar-button"; 
+            document.body.appendChild(arButton);
+
+            // --- Custom Button Logic ---
+            customArButton.addEventListener('click', () => {
+                console.log("Custom button clicked, triggering real AR button.");
+                initAudioAndUnlock(); 
+                arButton.click(); 
+            });
+
+            // --- Listen for AR session start ---
+            renderer.xr.addEventListener('sessionstart', () => {
+                if (gameState === GAME_STATE.INITIALIZING) {
+                    if (!audioUnlocked) initAudioAndUnlock(); 
+                    
+                    if (bgmLoop && bgmLoop.paused) {
+                        bgmLoop.play().catch(e => console.error("BGM play failed:", e));
+                    }
+                    
+                    customArButton.style.display = 'none';
+                    gameState = GAME_STATE.SCANNING;
+                    updateMessage("Move phone to scan floor");
+
+                    // Get hit test source
+                    const currentSession = renderer.xr.getSession();
+                    currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
+                        currentSession.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                            hitTestSource = source;
+                        });
+                    });
+                }
+            });
+            
+            renderer.xr.addEventListener('sessionend', () => {
+                if (bgmLoop) bgmLoop.pause();
+                window.location.reload();
+            });
+
+            // --- New Control Logic (Tap, Hold, Drag) ---
+            let touchStartX, touchStartY, touchStartTime;
+            let strafeInterval = null;
+            let isDragging = false;
+            const DRAG_THRESHOLD_Y = 75; 
+            const STRAFE_INTERVAL_MS = 130; 
+
+            function onTouchStart(e) {
+                e.preventDefault(); 
+                
+                if (gameState === GAME_STATE.PLACING) {
+                    updateMessage("Starting Game...", true);
+                    startGame();
+                    return; 
+                }
+
+                if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) {
+                    return; 
+                }
+
+                if (strafeInterval) clearInterval(strafeInterval);
+                
+                const touch = e.touches[0];
+                touchStartX = touch.pageX;
+                touchStartY = touch.pageY;
+                touchStartTime = new Date().getTime();
+                isDragging = false;
+
+                const screenWidth = window.innerWidth;
+                
+                if (touchStartX < screenWidth * 0.33) {
+                    // Left Side
+                    movePiece(-1); 
+                    strafeInterval = setInterval(() => movePiece(-1), STRAFE_INTERVAL_MS);
+                } else if (touchStartX > screenWidth * 0.66) {
+                    // Right Side
+                    movePiece(1); 
+                    strafeInterval = setInterval(() => movePiece(1), STRAFE_INTERVAL_MS);
                 }
             }
-        });
-        scene.add(controller);
+            
+            function onTouchMove(e) {
+                e.preventDefault();
+                if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) {
+                    return;
+                }
+                
+                const touch = e.touches[0];
+                const deltaY = touch.pageY - touchStartY;
+                
+                if (deltaY > DRAG_THRESHOLD_Y) {
+                    // Drag Down (Hard Drop)
+                    if (strafeInterval) clearInterval(strafeInterval); 
+                    hardDrop();
+                    
+                    touchStartY = null; 
+                    touchStartX = null;
+                    isDragging = true; 
+                }
+            }
+            
+            function onTouchEnd(e) {
+                e.preventDefault();
+                if (gameState !== GAME_STATE.PLAYING) return;
+                
+                if (strafeInterval) clearInterval(strafeInterval);
+                
+                if (isDragging) {
+                    isDragging = false;
+                    return;
+                }
+                
+                const screenWidth = window.innerWidth;
+                const touchTime = new Date().getTime() - touchStartTime;
 
-        // --- Game Logic ---
-        updateWordDisplay();
-        updateHangman();
+                if (touchTime < STRAFE_INTERVAL_MS) {
+                    if (touchStartX > screenWidth * 0.33 && touchStartX < screenWidth * 0.66) {
+                        // Middle Tap (Rotate)
+                        rotatePiece();
+                    }
+                }
+            }
+            
+            renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+            renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
+            renderer.domElement.addEventListener('touchcancel', onTouchEnd, { passive: false });
 
-        // --- Restart Game ---
-        document.getElementById('restart-button').addEventListener('click', () => {
-            guessedLetters = [];
-            wrongGuesses = 0;
-            hiddenWord = words[Math.floor(Math.random() * words.length)];
-            letters.forEach(letter => scene.remove(letter));
-            letters = [];
-            alphabet.split('').forEach((char, i) => {
-                const x = (i % 5) * 0.2 - 0.4;
-                const y = Math.floor(i / 5) * -0.2 - 0.2;
-                letters.push(createLetter(char, x, y, -1));
+
+            window.addEventListener('resize', onWindowResize);
+            
+            // --- FIX: New Scanner Mesh (10x2 base) ---
+            const gridGeo = new THREE.PlaneGeometry(
+                BOARD_WIDTH * BLOCK_SIZE, 
+                2 * BLOCK_SIZE, // Only 2 blocks deep
+                BOARD_WIDTH, 
+                2
+            );
+            const gridMat = new THREE.MeshBasicMaterial({
+                color: 0x00FFFF, // Bright cyan
+                wireframe: true,
+                transparent: true,
+                opacity: 0.7
             });
-            document.getElementById('message').textContent = '';
-            updateWordDisplay();
-            updateHangman();
-        });
+            const wireframeGrid = new THREE.Mesh(gridGeo, gridMat);
+            wireframeGrid.rotation.x = -Math.PI / 2; // Lay flat
+            
+            placementGrid = new THREE.Group();
+            placementGrid.add(wireframeGrid);
+            placementGrid.matrixAutoUpdate = false;
+            placementGrid.visible = false;
+            scene.add(placementGrid);
+            
+            gameBoard = new THREE.Group();
+            
+            renderer.setAnimationLoop(animate);
+        }
 
-        // --- Animation Loop ---
-        renderer.setAnimationLoop(() => {
+        // --- FIX: Audio Init and Unlock Function ---
+        function initAudioAndUnlock() {
+            if (audioUnlocked) return; 
+            
+            console.log("Attempting to unlock audio...");
+            
+            bgmLoop = document.getElementById('audio-bgm');
+            moveSound = document.getElementById('audio-move');
+            rotateSound = document.getElementById('audio-move'); 
+            gameOverSound = document.getElementById('audio-gameover');
+            lineClearSound = document.getElementById('audio-lineclear');
+            
+            const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound];
+            
+            // This is the most reliable way to "unlock" audio.
+            sounds.forEach(sound => {
+                if (sound) {
+                    sound.load(); // Load the file
+                    const playPromise = sound.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            sound.pause();
+                            sound.currentTime = 0;
+                            console.log("Unlocked:", sound.id);
+                        }).catch(e => {
+                            // This catch is important, especially for BGM
+                            console.warn("Audio unlock failed for:", sound.id, e);
+                        });
+                    }
+                }
+            });
+
+            // Set volumes
+            bgmLoop.volume = 0.3;
+            moveSound.volume = 0.8;
+            rotateSound.volume = 0.8;
+            gameOverSound.volume = 0.7;
+            if(lineClearSound) lineClearSound.volume = 0.7;
+            
+            audioUnlocked = true;
+        }
+
+        // --- Helper function to play sounds ---
+        function playSound(audioElement) {
+            if (!audioElement || !audioUnlocked) return;
+            audioElement.currentTime = 0; 
+            audioElement.play().catch(e => console.warn("Sound play failed:", e)); 
+        }
+
+        // --- Game Loop ---
+        function animate(timestamp, frame) {
+            if (frame) {
+                const session = renderer.xr.getSession();
+                if (!session) {
+                    renderer.render(scene, camera);
+                    return;
+                }
+
+                // --- Scanning Logic (Mesh Only) ---
+                if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
+                    if (hitTestSource) {
+                        const hitTestResults = frame.getHitTestResults(hitTestSource);
+                        if (hitTestResults.length > 0) {
+                            // Plane found, show MESH
+                            const hit = hitTestResults[0];
+                            const referenceSpace = renderer.xr.getReferenceSpace();
+                            const pose = hit.getPose(referenceSpace);
+                            
+                            placementGrid.matrix.fromArray(pose.transform.matrix);
+                            placementGrid.visible = true;
+                            
+                            if (gameState === GAME_STATE.SCANNING) {
+                                gameState = GAME_STATE.PLACING;
+                                updateMessage("Tap screen to lock floor");
+                            }
+                        } else {
+                            // No plane found, hide MESH
+                            placementGrid.visible = false;
+                        }
+                    }
+                }
+            }
             renderer.render(scene, camera);
-        });
-
-        // --- Handle Window Resize ---
-        window.addEventListener('resize', () => {
+        }
+        
+        // --- Event Handlers ---
+        function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
-</body>
+        }
+
+        // --- Game State Functions ---
+        function updateMessage(message, autoHide = false) {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            if (autoHide) {
+                setTimeout(() => { messageBox.style.display = 'none'; }, 2000);
+            }
+        }
+
+        function startGame() {
+            gameState = GAME_STATE.PLAYING;
+            scoreBox.style.display = 'block';
+            updateScore(0);
+            
+            // --- FIX: New Vertical Placement Logic ---
+            const depthOffset = -0.5; // Push 50cm "away" from user
+            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; // Lift board up by half its height
+
+            // 1. Get position and orientation from the flat floor grid
+            gameBoard.applyMatrix4(placementGrid.matrix);
+            
+            // 2. Rotate it to stand up (like a laptop screen)
+            gameBoard.rotation.x = -Math.PI / 2;
+            
+            // 3. Lift it so its base is on the floor
+            gameBoard.translateY(baseLift);
+            
+            // 4. Push it back from the camera
+            gameBoard.translateZ(depthOffset);
+            
+            scene.add(gameBoard);
+            
+            placementGrid.visible = false;
+            
+            spawnPiece();
+            gameLoopInterval = setInterval(gameTick, 1000);
+        }
+
+        function gameTick() {
+            if (!currentPiece) return;
+
+            if (isValidMove(currentPiece, { y: 1 })) {
+                currentPiece.userData.gridPos.y += 1;
+                updatePiecePosition(currentPiece);
+            } else {
+                lockPiece();
+                spawnPiece();
+            }
+        }
+        
+        function gameOver() {
+            clearInterval(gameLoopInterval);
+            gameState = GAME_STATE.GAME_OVER;
+            gameOverBox.style.display = 'block';
+            
+            if (bgmLoop) bgmLoop.pause();
+            playSound(gameOverSound);
+        }
+
+function updateScore(linesCleared) {
+            const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
+            if (linesCleared > 0) {
+                score += points[linesCleared] || 0;
+                playSound(lineClearSound);
+                
+                // Line Clear Flash Effect
+                const flash = document.createElement('div');
+                flash.style.position = 'absolute';
+                flash.style.top = '0';
+                flash.style.left = '0';
+                flash.style.width = '100%';
+                flash.style.height = '100%';
+                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                flash.style.zIndex = '999';
+                flash.style.pointerEvents = 'none'; // So it doesn't block controls
+                document.body.appendChild(flash);
+                setTimeout(() => document.body.removeChild(flash), 100);
+            }
+            scoreBox.textContent = `Score: ${score}`;
+        }
+        
+        // --- New Move Piece function for tap controls ---
+        function movePiece(direction) { // -1 for left, 1 for right
+            if (!currentPiece) return;
+            if (isValidMove(currentPiece, { x: direction })) {
+                currentPiece.userData.gridPos.x += direction;
+                updatePiecePosition(currentPiece);
+                triggerHaptic(20);
+                playSound(moveSound);
+            }
+        }
+        
+        // --- FIX: This function now positions pieces in the VERTICAL board space ---
+        function updatePiecePosition(piece) {
+            const ud = piece.userData;
+            // Y-axis is inverted: gridY 0 is at the top (high 3D Y)
+            piece.position.set(
+                (ud.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
+                (BOARD_HEIGHT / 2 - 0.5 - ud.gridPos.y) * BLOCK_SIZE,
+                0 // All pieces are at Z=0 relative to the gameBoard
+            );
+        }
+
+        function spawnPiece() {
+            const typeIndex = Math.floor(Math.random() * SHAPES.length);
+            const rotationIndex = 0; 
+            const shape = SHAPES[typeIndex][rotationIndex];
+            const color = COLORS[typeIndex + 1];
+            
+            const piece = new THREE.Group();
+            piece.userData = {
+                shape: shape,
+                typeIndex: typeIndex,
+                rotationIndex: rotationIndex,
+                gridPos: {
+                    x: Math.floor((BOARD_WIDTH - shape[0].length) / 2),
+                    y: 0 
+                }
+            };
+            
+            // --- FIX: Blocks are now 80% deep (z-axis) for 3D effect ---
+            const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+            const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+            const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+            const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const block = new THREE.Mesh(blockGeo, blockMat);
+                        const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                        block.add(bevel);
+                        block.position.set(
+                            x * BLOCK_SIZE,
+                            -y * BLOCK_SIZE, 
+                            0
+                        );
+                        piece.add(block);
+                    }
+                }
+            }
+
+            updatePiecePosition(piece);
+
+            gameBoard.add(piece);
+            currentPiece = piece;
+            
+            if (!isValidMove(currentPiece, {})) {
+                gameOver();
+            }
+        }
+        
+        function rotatePiece() {
+            if (!currentPiece) return;
+            
+            const ud = currentPiece.userData;
+            const newRotationIndex = (ud.rotationIndex + 1) % SHAPES[ud.typeIndex].length;
+            const newShape = SHAPES[ud.typeIndex][newRotationIndex];
+            
+            const kicks = [0, 1, -1, 2, -2]; 
+            for (const kick of kicks) {
+                const testPos = { 
+                    x: ud.gridPos.x + kick, 
+                    y: ud.gridPos.y 
+                };
+
+                if (isValidMove(currentPiece, { shape: newShape, pos: testPos })) {
+                    ud.rotationIndex = newRotationIndex;
+                    ud.shape = newShape;
+                    ud.gridPos.x = testPos.x; 
+                    
+                    while (currentPiece.children.length) {
+                        currentPiece.remove(currentPiece.children[0]);
+                    }
+                    const color = COLORS[ud.typeIndex + 1];
+                    const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+                    const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+                    const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+                    const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
+                    for (let y = 0; y < newShape.length; y++) {
+                        for (let x = 0; x < newShape[y].length; x++) {
+                            if (newShape[y][x]) {
+                                const block = new THREE.Mesh(blockGeo, blockMat);
+                                const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                                block.add(bevel);
+                                block.position.set(
+                                    x * BLOCK_SIZE,
+                                    -y * BLOCK_SIZE,
+                                    0
+                                );
+                                currentPiece.add(block);
+                            }
+                        }
+                    }
+                    
+                    updatePiecePosition(currentPiece);
+                    
+                    triggerHaptic(30);
+                    playSound(rotateSound);
+                    return; 
+                }
+            }
+        }
+        
+        function hardDrop() {
+            if (!currentPiece) return;
+            
+            while (isValidMove(currentPiece, { y: 1 })) {
+                currentPiece.userData.gridPos.y += 1;
+            }
+            
+            updatePiecePosition(currentPiece);
+            
+            lockPiece();
+            spawnPiece();
+            
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(gameTick, 1000);
+            
+            triggerHaptic(50);
+            playSound(moveSound); 
+        }
+
+        function isValidMove(piece, delta) {
+            const ud = piece.userData;
+            const shape = delta.shape || ud.shape;
+            
+            const newGridX = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
+            const newGridY = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
+
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const boardX = newGridX + x;
+                        const boardY = newGridY + y; 
+
+                        if (boardX < 0 || boardX >= BOARD_WIDTH) {
+                            return false;
+                        }
+                        
+                        if (boardY >= BOARD_HEIGHT) {
+                            return false;
+                        }
+                        
+                        if (boardY >= 0 && grid[boardY][boardX]) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function lockPiece() {
+            if (!currentPiece) return;
+            
+            const ud = currentPiece.userData;
+            const shape = ud.shape;
+            const gridX = ud.gridPos.x;
+            const gridY = ud.gridPos.y; 
+            
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const boardX = gridX + x;
+                        const boardY = gridY + y;
+                        
+                        if (boardY < 0 || boardY >= BOARD_HEIGHT) {
+                            continue; 
+                        }
+                        
+                        grid[boardY][boardX] = ud.typeIndex + 1;
+                        
+                        const color = COLORS[ud.typeIndex + 1];
+                        const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+                        const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+                        const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+                        const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
+                        const newBlock = new THREE.Mesh(blockGeo, blockMat);
+                        const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                        newBlock.add(newBevel);
+                        
+                        // Set its position *in gameBoard's local space*
+                        newBlock.position.set(
+                            (boardX - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
+                            (BOARD_HEIGHT / 2 - 0.5 - boardY) * BLOCK_SIZE,
+                            0
+                        );
+                        gameBoard.add(newBlock);
+                    }
+                }
+            }
+            
+            gameBoard.remove(currentPiece);
+            currentPiece = null;
+            
+            checkLineClears();
+        }
+
+        function checkLineClears() {
+            let linesCleared = 0;
+            let rowsToClear = [];
+            
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                if (grid[y].every(cell => cell > 0)) {
+                    linesCleared++;
+                    rowsToClear.push(y);
+                }
+            }
+
+            if (linesCleared > 0) {
+                gameBoard.children = gameBoard.children.filter(block => {
+                    if (block === currentPiece) return true; 
+                    
+                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                    return !rowsToClear.includes(blockY); 
+                });
+                
+                for (const y of rowsToClear.sort((a, b) => a - b)) { 
+                    grid.splice(y, 1);
+                    grid.unshift(Array(BOARD_WIDTH).fill(0));
+                }
+                
+                gameBoard.children.forEach(block => {
+                    if (block === currentPiece) return; 
+
+                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                    let shift = 0;
+                    for (const clearedY of rowsToClear) {
+                        if (blockY < clearedY) { 
+                            shift++;
+                        }
+                    }
+                    if (shift > 0) {
+                        block.position.y -= shift * BLOCK_SIZE;
+                    }
+                });
+                
+                updateScore(linesCleared);
+            }
+        }
+    </script></body>
 </html>

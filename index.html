@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v14 - Vertical Board)</title>
+    <title>AR Tetris 3D (v15 - Floor Lock Fix)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -152,9 +152,9 @@
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
 
-        // --- FIX: Board Size ---
+        // --- Board Size ---
         const BOARD_WIDTH = 10;
-        const BOARD_HEIGHT = 20; // Back to 20 for standard vertical game
+        const BOARD_HEIGHT = 20; 
         const BLOCK_SIZE = 0.1; // 10cm blocks
         
         let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
@@ -237,10 +237,14 @@
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Move phone to scan floor");
 
-                    // Get hit test source
+                    // --- FIX: Request Hit Test for PLANES only ---
                     const currentSession = renderer.xr.getSession();
                     currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
-                        currentSession.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                        // This is the critical change
+                        currentSession.requestHitTestSource({ 
+                            space: referenceSpace,
+                            entityTypes: ['plane'] // Only look for planes (floors/tables)
+                        }).then((source) => {
                             hitTestSource = source;
                         });
                     });
@@ -343,7 +347,7 @@
 
             window.addEventListener('resize', onWindowResize);
             
-            // --- FIX: New Scanner Mesh (10x2 base) ---
+            // --- New Scanner Mesh (10x2 base) ---
             const gridGeo = new THREE.PlaneGeometry(
                 BOARD_WIDTH * BLOCK_SIZE, 
                 2 * BLOCK_SIZE, // Only 2 blocks deep
@@ -370,7 +374,7 @@
             renderer.setAnimationLoop(animate);
         }
 
-        // --- FIX: Audio Init and Unlock Function ---
+        // --- Audio Init and Unlock Function ---
         function initAudioAndUnlock() {
             if (audioUnlocked) return; 
             
@@ -384,7 +388,6 @@
             
             const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound];
             
-            // This is the most reliable way to "unlock" audio.
             sounds.forEach(sound => {
                 if (sound) {
                     sound.load(); // Load the file
@@ -395,7 +398,6 @@
                             sound.currentTime = 0;
                             console.log("Unlocked:", sound.id);
                         }).catch(e => {
-                            // This catch is important, especially for BGM
                             console.warn("Audio unlock failed for:", sound.id, e);
                         });
                     }
@@ -431,7 +433,8 @@
                 // --- Scanning Logic (Mesh Only) ---
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (hitTestSource) {
-                        const hitTestResults = frame.getHitTestResults(hitTestSource);
+                        // --- FIX: Use .getResults() which respects the 'plane' entityType ---
+                        const hitTestResults = frame.getHitTestResults(hitTestSource); 
                         if (hitTestResults.length > 0) {
                             // Plane found, show MESH
                             const hit = hitTestResults[0];
@@ -476,20 +479,13 @@
             scoreBox.style.display = 'block';
             updateScore(0);
             
-            // --- FIX: New Vertical Placement Logic ---
+            // --- Vertical Placement Logic ---
             const depthOffset = -0.5; // Push 50cm "away" from user
             const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; // Lift board up by half its height
 
-            // 1. Get position and orientation from the flat floor grid
             gameBoard.applyMatrix4(placementGrid.matrix);
-            
-            // 2. Rotate it to stand up (like a laptop screen)
             gameBoard.rotation.x = -Math.PI / 2;
-            
-            // 3. Lift it so its base is on the floor
             gameBoard.translateY(baseLift);
-            
-            // 4. Push it back from the camera
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
@@ -536,7 +532,7 @@ function updateScore(linesCleared) {
                 flash.style.height = '100%';
                 flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
                 flash.style.zIndex = '999';
-                flash.style.pointerEvents = 'none'; // So it doesn't block controls
+                flash.style.pointerEvents = 'none'; 
                 document.body.appendChild(flash);
                 setTimeout(() => document.body.removeChild(flash), 100);
             }
@@ -554,10 +550,9 @@ function updateScore(linesCleared) {
             }
         }
         
-        // --- FIX: This function now positions pieces in the VERTICAL board space ---
+        // --- This function positions pieces in the VERTICAL board space ---
         function updatePiecePosition(piece) {
             const ud = piece.userData;
-            // Y-axis is inverted: gridY 0 is at the top (high 3D Y)
             piece.position.set(
                 (ud.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
                 (BOARD_HEIGHT / 2 - 0.5 - ud.gridPos.y) * BLOCK_SIZE,
@@ -582,7 +577,6 @@ function updateScore(linesCleared) {
                 }
             };
             
-            // --- FIX: Blocks are now 80% deep (z-axis) for 3D effect ---
             const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
             const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
             const bevelGeo = new THREE.EdgesGeometry(blockGeo);
@@ -746,7 +740,6 @@ function updateScore(linesCleared) {
                         const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
                         newBlock.add(newBevel);
                         
-                        // Set its position *in gameBoard's local space*
                         newBlock.position.set(
                             (boardX - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
                             (BOARD_HEIGHT / 2 - 0.5 - boardY) * BLOCK_SIZE,

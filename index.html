@@ -279,28 +279,33 @@
 
             // --- NEW: Custom Button Logic ---
             customArButton.addEventListener('click', () => {
-                if (!audioInitialized) {
-                    initAudio();
-                }
-
-                // Start audio context (required by browsers)
-                Tone.start();
-                
-                // Start BGM
-                bgmLoop.start(0);
-                Tone.Transport.start();
-
-                // Programmatically click the *real* (hidden) AR button
+                // Just click the real button.
+                // The ARButton.js library will handle calling Tone.start()
+                // and requesting the session.
                 arButton.click();
-                
-                // Hide our custom button
-                customArButton.style.display = 'none';
+            });
 
+            // --- NEW: Listen for AR session start ---
+            renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
+                    
+                    // Init audio objects now that we know audio context is ready
+                    if (!audioInitialized) {
+                        initAudio();
+                    }
+
+                    // Start BGM
+                    bgmLoop.start(0);
+                    Tone.Transport.start();
+
+                    // Hide our custom button
+                    customArButton.style.display = 'none';
+
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Move phone to scan floor");
                 }
             });
+            // --- End of new listener ---
 
             controller = renderer.xr.getController(0);
             controller.addEventListener('select', onSelect);
@@ -311,7 +316,7 @@
             renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
             window.addEventListener('resize', onWindowResize);
             
-            updateMessage("Please install ARCore and use Chrome", false);
+            // updateMessage("Please install ARCore and use Chrome", false); // This is no longer needed
             renderer.setAnimationLoop(animate);
         }
 
@@ -412,8 +417,17 @@
         // --- GAME LOOP ---
         function animate(timestamp, frame) {
             if (frame) {
+                // --- NEW: Get session inside animate loop ---
+                const session = renderer.xr.getSession();
+                if (!session) {
+                    renderer.render(scene, camera);
+                    return; // No session, don't do anything else
+                }
+                // --- End of new check ---
+
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (!hitTestSource) {
+                        // --- FIX: Pass session to requestReferenceSpace ---
                         session.requestReferenceSpace('viewer').then((referenceSpace) => {
                             session.requestHitTestSource({ space: referenceSpace }).then((source) => {
                                 hitTestSource = source;
@@ -424,7 +438,8 @@
                         const hitTestResults = frame.getHitTestResults(hitTestSource);
                         if (hitTestResults.length > 0) {
                             const hit = hitTestResults[0];
-                            const pose = hit.getPose(renderer.xr.getReferenceSpace());
+                            const referenceSpace = renderer.xr.getReferenceSpace(); // This is fine
+                            const pose = hit.getPose(referenceSpace);
                             placementGrid.matrix.fromArray(pose.transform.matrix);
                             if(gameState === GAME_STATE.SCANNING) {
                                 gameState = GAME_STATE.PLACING;
@@ -435,7 +450,7 @@
                         } else if (gameState === GAME_STATE.SCANNING) {
                             placementGrid.visible = false;
                             scannerReticle.visible = true;
-                            const pose = frame.getViewerPose(renderer.xr.getReferenceSpace());
+                            const pose = frame.getViewerPose(renderer.xr.getReferenceSpace()); // This is fine
                             if (pose) {
                                 const transform = new THREE.Matrix4().fromArray(pose.views[0].transform.matrix);
                                 const position = new THREE.Vector3().setFromMatrixPosition(transform);
@@ -597,5 +612,6 @@
     </script>
 </body>
 </html>
+
 
 

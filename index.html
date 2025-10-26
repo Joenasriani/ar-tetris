@@ -1,640 +1,763 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>AR Tetris 3D (v4)</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta charset="utf-8">
-    
-    <!-- 
-      NEW: Import Tone.js for sound synthesis.
-      This must be loaded *before* our game script.
-    -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.min.js"></script>
+<html lang="en">
 
+<head>
+    <title>AR Tetris 3D (v9 - Line Clear SFX)</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="xr-spatial-tracking" content="true">
+    
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        /* Basic reset */
+        body, html {
+            width: 100%;
+            height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #111;
+            color: white;
+            touch-action: manipulation;
         }
 
-        /* NEW: This is our new, fancy button.
-        */
-        #custom-ar-button {
+        /* The 3D canvas */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Base style for all UI elements */
+        .ui-element {
             position: absolute;
-            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            width: 80%;
-            max-width: 350px;
-            padding: 14px 0px;
-            background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-            border: none;
-            border-radius: 12px;
-            font-size: 20px;
-            font-weight: 600;
-            cursor: pointer;
+            padding: 12px 24px;
+            background-color: rgba(0, 0, 0, 0.6);
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 500;
             z-index: 100;
-            box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
-            transition: all 0.2s ease;
+        }
+
+        /* Message box at the top */
+        #message-box {
+            top: 30px;
+            display: none; /* Hidden by default */
+        }
+        
+        /* Game Over message */
+        #game-over-box {
+            top: 50%;
+            transform: translate(-50%, -50%);
+            color: #FF4136; /* Red */
+            font-size: 2rem;
+            font-weight: bold;
+            display: none; /* Hidden by default */
+        }
+
+        /* Score box at the top left */
+        #score-box {
+            top: 30px;
+            left: 30px;
+            transform: none; /* Override absolute center */
+            color: #FFDC00; /* Gold */
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Custom AR Button */
+        #custom-ar-button {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 18px 30px;
+            border-radius: 50px;
+            background: linear-gradient(145deg, #8a2be2, #4169e1); /* Blue-Violet gradient */
+            color: white;
+            font-size: 1.3rem;
+            font-weight: 600;
+            border: none;
+            box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
+            cursor: pointer;
+            z-index: 101;
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             gap: 10px;
+            transition: all 0.3s ease;
         }
 
         #custom-ar-button:hover {
-            transform: translateX(-50%) scale(1.03);
-            box-shadow: 0 8px 25px rgba(118, 75, 162, 0.6);
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 8px 25px rgba(65, 105, 225, 0.7);
         }
 
-        /* NEW: Hide the default button from ARButton.js
-          We will click this button *with our code*.
-        */
-        #ARButton {
-            display: none !important;
+        #custom-ar-button svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
         }
-        
-        #ui-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            z-index: 10;
-            pointer-events: none;
-        }
-
-        #message {
-            font-size: 22px;
-            font-weight: 500;
-            color: white;
-            background-color: rgba(0, 0, 0, 0.6);
-            padding: 12px 20px;
-            border-radius: 12px;
-            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-            transition: opacity 0.3s;
-        }
-
-        /* NEW: Game Over specific style */
-        #message.game-over-msg {
-            background-color: rgba(211, 47, 47, 0.7); /* Red background */
-            font-size: 28px;
-            font-weight: 700;
-            padding: 20px 25px;
-        }
-
-        #score-display {
-            position: absolute;
-            top: 25px;
-            left: 25px;
-            font-size: 32px;
-            font-weight: 700;
-            /* NEW: Color UI */
-            color: #ffeb3b; /* Gold */
-            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
-            z-index: 100;
-            display: none;
-        }
-
-        /* NEW: Screen flash effect for line clears */
-        #screen-flash {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #ffffff;
-            opacity: 0;
-            pointer-events: none;
-            z-index: 200;
-            transition: opacity 0.3s;
-        }
-
-        #screen-flash.flash {
-            opacity: 0.7;
-        }
-
     </style>
 </head>
+
 <body>
-    <!-- NEW: Our custom button -->
+    <!-- 3D content will be rendered here -->
+
+    <!-- UI Elements -->
+    <div id="message-box" class="ui-element">Move phone to scan floor</div>
+    <div id="game-over-box" class="ui-element">GAME OVER</div>
+    <div id="score-box" class="ui-element" style="display: none;">Score: 0</div>
+
+    <!-- The fancy AR button -->
     <button id="custom-ar-button">
-        <!-- NEW: Inline SVG for AR icon -->
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: white;">
-            <path d="M4 4V8H8M4 20V16H8M20 4V8H16M20 20V16H16M3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M19.7,3.3C17-0.9,12-1,9.3,3.3L3.3,9.3c-3.6,3.6-3.6,9.4,0,13.1C5,24,6.9,24,8.6,24s3.6-0.7,5-2l6.8-6.8l-1.9-1.9
+            l-6.8,6.8c-2.1,2.1-5.6,2.1-7.8,0c-2.1-2.1-2.1-5.6,0-7.8l6-6c2.1-2.1,5.6-2.1,7.8,0c1,1,1.6,2.4,1.6,3.8c0,0.3,0.2,0.5,0.5,0.5
+            s0.5-0.2,0.5-0.5C21.3,5.7,20.7,4.3,19.7,3.3z M20.7,14.7L14,21.4l1.9,1.9l6.8-6.8c2.1-2.1,2.1-5.6,0-7.8c-2.1-2.1-5.6-2.1-7.8,0
+            c-1,1-1.6,2.4-1.6,3.8c0,0.3-0.2,0.5-0.5,0.5S12.3,12.5,12.3,12.2c0-2.4,1-4.7,2.7-6.4c2.6-2.6,6.9-2.5,9.5,0.1
+            C28.2,9.6,24.4,18.4,20.7,14.7z"/>
         </svg>
         Launch AR
     </button>
+    
+    <!-- 
+      HTML Audio Elements
+    -->
+    <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto"></audio>
+    <audio id="audio-move" src="/music/tik.mp3" preload="auto"></audio>
+    <audio id="audio-gameover" src="/music/outro.mp3" preload="auto"></audio>
+    <!-- NEW: Added line clear sound -->
+    <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto"></audio>
 
-    <div id="ui-container">
-        <div id="message" style="display: none;"></div>
-    </div>
-    <div id="score-display">Score: 0</div>
-    <div id="screen-flash"></div> <!-- NEW: Flash element -->
 
+    <!-- 
+      JavaScript Libraries
+    -->
     <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+            }
         }
-    }
     </script>
+    
 
     <script type="module">
         import * as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
-
-        // --- GLOBAL VARIABLES ---
+        
+        // --- Global Variables ---
         let camera, scene, renderer;
         let controller;
         let hitTestSource = null;
+        let placementGrid = null; 
+        let scannerReticle = null; 
+        let gameBoard = null; 
+        let currentPiece = null;
+        let gameLoopInterval = null;
         
-        let placementGrid;
-        let scannerReticle;
-
-        let gameBoard = new THREE.Group();
-        let activePiece = null;
+        // UI Elements
+        let customArButton, messageBox, scoreBox, gameOverBox;
         
-        let messageEl = document.getElementById('message');
-        let scoreEl = document.getElementById('score-display');
-        let flashEl = document.getElementById('screen-flash');
-        let customArButton = document.getElementById('custom-ar-button');
-
+        // Game state
         const GAME_STATE = {
-            INITIALIZING: 'INITIALIZING',
-            SCANNING: 'SCANNING',
-            PLACING: 'PLACING',
-            PLAYING: 'PLAYING',
-            GAME_OVER: 'GAME_OVER'
+            INITIALIZING: 0,
+            SCANNING: 1,
+            PLACING: 2,
+            PLAYING: 3,
+            GAME_OVER: 4
         };
         let gameState = GAME_STATE.INITIALIZING;
-        
-        const BOARD_WIDTH = 10, BOARD_HEIGHT = 20, BLOCK_SIZE = 0.05, SPAWN_HEIGHT = 2.0;
-        let fallSpeed = 1000, fastDropSpeed = 50, currentFallSpeed = 1000, lastFallTime = 0, score = 0;
-        let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null));
-        let lastTapTime = 0;
+        let score = 0;
 
-        // --- NEW: AUDIO SETUP (Tone.js) ---
-        let moveSound, lineClearSound, loseSound, bgmLoop;
-        let audioInitialized = false;
-
-        function initAudio() {
-            // "Tik" sound for moving
-            moveSound = new Tone.MembraneSynth({
-                pitchDecay: 0.01,
-                octaves: 2,
-                envelope: { attack: 0.001, decay: 0.1, sustain: 0 }
-            }).toDestination();
-
-            // "Line Clear" sound
-            lineClearSound = new Tone.Synth({
-                oscillator: { type: "sine" },
-                envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.1 }
-            }).toDestination();
-
-            // "Game Over" sound
-            loseSound = new Tone.PolySynth(Tone.Synth, {
-                oscillator: { type: "square" },
-                envelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 0.2 }
-            }).toDestination();
-            
-            // "Tetris" BGM
-            const bgmNotes = [
-                'E5', 'B4', 'C5', 'D5', 'E5', 'D5', 'C5', 'B4',
-                'A4', 'A4', 'C5', 'E5', 'D5', 'C5', 'B4', null,
-                'D5', 'F5', 'A5', 'G5', 'F5', 'E5', null, 'C5',
-                'E5', 'D5', 'C5', 'B4', 'A4', 'A4', 'C5', 'E5', 'D5', 'C5', 'B4', null
-            ];
-            
-            bgmLoop = new Tone.Sequence((time, note) => {
-                if (note) {
-                    moveSound.triggerAttackRelease(note, '8n', time);
-                }
-            }, bgmNotes, '8n');
-            
-            Tone.Transport.bpm.value = 140;
-            audioInitialized = true;
-        }
-
-        // --- 3D / TETRIS DEFINITIONS ---
-        const BLOCK_GEOMETRY = new THREE.BoxGeometry(BLOCK_SIZE * 0.95, BLOCK_SIZE * 0.95, BLOCK_SIZE * 0.95);
-
+        // Game Logic (constants)
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20;
+        const BOARD_DEPTH = 1;
+        const BLOCK_SIZE = 0.05;
+        let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+        const SHAPES = [
+            [[[1,1,1,1]], [[1],[1],[1],[1]]],
+            [[[1,1],[1,1]]],
+            [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]],
+            [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]],
+            [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]],
+            [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]],
+            [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]
+        ];
         const COLORS = {
-            'I': 0x00ffff, 'O': 0xffff00, 'T': 0x800080, 'S': 0x00ff00,
-            'Z': 0xff0000, 'J': 0x0000ff, 'L': 0xffa500
-        };
-        const MATERIALS = {};
-        for (const key in COLORS) MATERIALS[key] = new THREE.MeshLambertMaterial({ color: COLORS[key] });
-
-        const PIECES = {
-            'I': { shape: [[-1, 0, 0], [0, 0, 0], [1, 0, 0], [2, 0, 0]], type: 'I' },
-            'O': { shape: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0]], type: 'O' },
-            'T': { shape: [[-1, 0, 0], [0, 0, 0], [1, 0, 0], [0, 1, 0]], type: 'T' },
-            'S': { shape: [[0, 0, 0], [1, 0, 0], [-1, 1, 0], [0, 1, 0]], type: 'S' },
-            'Z': { shape: [[-1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]], type: 'Z' },
-            'J': { shape: [[-1, 1, 0], [-1, 0, 0], [0, 0, 0], [1, 0, 0]], type: 'J' },
-            'L': { shape: [[1, 1, 0], [-1, 0, 0], [0, 0, 0], [1, 0, 0]], type: 'L' }
+            1: 0x00F0F0, 2: 0xF0F000, 3: 0xA000F0, 4: 0x00F000, 5: 0xF00000, 6: 0x0000F0, 7: 0xF0A000,
         };
 
-        // --- INITIALIZATION ---
-        init();
+        // --- Audio Variables ---
+        // NEW: Added lineClearSound
+        let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
+
+        // --- Haptics ---
+        function triggerHaptic(duration = 20) {
+            if (navigator.vibrate) {
+                navigator.vibrate(duration);
+            }
+        }
         
+        // --- Init Functions ---
+        init();
+
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+            light.position.set(0.5, 1, 0.25);
+            scene.add(light);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+            directionalLight.position.set(0, 10, 0);
+            scene.add(directionalLight);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
-
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
-            directionalLight.position.set(1, 2, 1).normalize();
-            scene.add(directionalLight);
             
-            scene.add(gameBoard);
+            customArButton = document.getElementById('custom-ar-button');
+            messageBox = document.getElementById('message-box');
+            scoreBox = document.getElementById('score-box');
+            gameOverBox = document.getElementById('game-over-box');
 
-            // Create the *hidden* AR Button
+            // --- AR Button Setup ---
             const arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['hit-test', 'dom-overlay'],
+                requiredFeatures: ['hit-test', 'local-floor'],
+                optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
-            arButton.textContent = "Start AR Tetris";
-            // The button is hidden by CSS, but we add this just in case
             arButton.style.display = 'none';
             document.body.appendChild(arButton);
 
-            // --- NEW: Custom Button Logic ---
-            customArButton.addEventListener('click', async () => {
-                try {
-                    // This is the user gesture that unlocks audio.
-                    await Tone.start();
-                    console.log("Audio context started.");
-                    
-                    // Now that audio is unlocked, click the real AR button.
-                    arButton.click();
-                } catch (e) {
-                    console.error("Could not start audio:", e);
-                    // Even if audio fails, try to start AR.
-                    arButton.click();
+            // --- Custom Button Logic for MP3s ---
+            customArButton.addEventListener('click', () => {
+                console.log("Custom button clicked, triggering real AR button.");
+                
+                // Manually initialize audio on first user tap
+                initAudio();
+                
+                // Start BGM
+                if (bgmLoop.paused) {
+                    bgmLoop.play().catch(e => console.error("BGM play failed:", e));
                 }
+                
+                arButton.click();
             });
 
-            // --- NEW: Listen for AR session start ---
+            // --- Listen for AR session start ---
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
                     
-                    // Init audio objects now that we know audio context is ready
-                    if (!audioInitialized) {
-                        initAudio();
+                    if (!bgmLoop) initAudio(); // Failsafe
+                    
+                    if (bgmLoop.paused) {
+                        bgmLoop.play().catch(e => console.error("BGM play failed:", e));
                     }
-
-                    // Start BGM
-                    bgmLoop.start(0);
-                    Tone.Transport.start();
-
-                    // Hide our custom button
+                    
                     customArButton.style.display = 'none';
-
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Move phone to scan floor");
 
-                    // --- NEW: Create Hit Test Source HERE ---
-                    // Get the session from the renderer
                     const currentSession = renderer.xr.getSession();
                     currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
                         currentSession.requestHitTestSource({ space: referenceSpace }).then((source) => {
                             hitTestSource = source;
                         });
                     });
-                    // --- End of new code ---
                 }
             });
-            // --- End of new listener ---
+            
+            renderer.xr.addEventListener('sessionend', () => {
+                if (bgmLoop) bgmLoop.pause();
+                window.location.reload();
+            });
 
+            // Controller Setup
             controller = renderer.xr.getController(0);
-            controller.addEventListener('select', onSelect);
             scene.add(controller);
 
-            createScanners();
+            // Touch Controls
+            let touchDown, touchX, touchY, deltaX, deltaY, lastTap = 0;
+            const tapDelay = 300;
+            const moveThreshold = 50;
+
+            function onTouchStart(e) {
+                // --- MODIFIED: Added check for placing ---
+                if (gameState === GAME_STATE.PLACING) {
+                    // This is the tap to lock the floor
+                    updateMessage("Starting Game...", true);
+                    startGame();
+                    return; // Don't process other game input
+                }
+
+                if (gameState !== GAME_STATE.PLAYING) return;
+                touchDown = true;
+                touchX = e.touches[0].pageX;
+                touchY = e.touches[0].pageY;
+                deltaX = 0;
+                deltaY = 0;
+            }
+
+            function onTouchMove(e) {
+                if (gameState !== GAME_STATE.PLAYING || !touchDown) return;
+                deltaX = e.touches[0].pageX - touchX;
+                deltaY = e.touches[0].pageY - touchY;
+                if (Math.abs(deltaX) > moveThreshold) {
+                    const direction = deltaX > 0 ? 1 : -1;
+                    if (isValidMove(currentPiece, { x: direction })) {
+                        currentPiece.position.x += direction * BLOCK_SIZE;
+                        triggerHaptic(20);
+                        playSound(moveSound);
+                    }
+                    touchX = e.touches[0].pageX;
+                    deltaX = 0; 
+                }
+                if (deltaY > moveThreshold * 2) {
+                    hardDrop();
+                    touchY = e.touches[0].pageY;
+                    deltaY = 0;
+                }
+            }
+            
+            function onTouchEnd(e) {
+                if (gameState !== GAME_STATE.PLAYING) return;
+                touchDown = false;
+                if (Math.abs(deltaX) < moveThreshold && Math.abs(deltaY) < moveThreshold) {
+                    const now = new Date().getTime();
+                    if (now - lastTap < tapDelay) {
+                        hardDrop();
+                    } else {
+                        rotatePiece();
+                    }
+                    lastTap = now;
+                }
+            }
             
             renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+            renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
+
             window.addEventListener('resize', onWindowResize);
             
-            // updateMessage("Please install ARCore and use Chrome", false); // This is no longer needed
+            // Scanner / Reticle Setup
+            scannerReticle = new THREE.Mesh(
+                new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2),
+                new THREE.MeshBasicMaterial({ color: 0x4169E1, opacity: 0.7, transparent: true })
+            );
+            scannerReticle.matrixAutoUpdate = false;
+            scannerReticle.visible = false;
+            scene.add(scannerReticle);
+            
+            const gridHelper = new THREE.GridHelper(BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH, 0x4169E1, 0x4169E1);
+            gridHelper.rotation.x = -Math.PI / 2;
+            const gridHelper2 = new THREE.GridHelper(BOARD_HEIGHT * BLOCK_SIZE, BOARD_HEIGHT, 0x4169E1, 0x4169E1);
+            placementGrid = new THREE.Group();
+            placementGrid.add(gridHelper);
+            placementGrid.add(gridHelper2);
+            placementGrid.matrixAutoUpdate = false;
+            placementGrid.visible = false;
+            scene.add(placementGrid);
+            
+            gameBoard = new THREE.Group();
+            
             renderer.setAnimationLoop(animate);
         }
 
-        // --- AR / WEBXR FUNCTIONS ---
-        function createScanners() {
-            scannerReticle = new THREE.Mesh(
-                new THREE.RingGeometry(0.08, 0.1, 32),
-                new THREE.MeshBasicMaterial({ color: 0x007aff, opacity: 0.7, transparent: true })
-            );
-            scannerReticle.rotateX(-Math.PI / 2);
-            scannerReticle.visible = false;
-            scene.add(scannerReticle);
-
-            placementGrid = new THREE.Group();
-            const gridMaterial = new THREE.LineBasicMaterial({ color: 0x007aff, transparent: true, opacity: 0.6 });
-            const w = BOARD_WIDTH * BLOCK_SIZE, h = BOARD_HEIGHT * BLOCK_SIZE;
-
-            for (let i = 0; i <= BOARD_WIDTH; i++) {
-                const x = (i - BOARD_WIDTH / 2) * BLOCK_SIZE;
-                placementGrid.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, 0, -h / 2), new THREE.Vector3(x, 0, h / 2)]), gridMaterial));
-            }
-            for (let i = 0; i <= BOARD_HEIGHT; i++) {
-                const z = (i - BOARD_HEIGHT / 2) * BLOCK_SIZE;
-                placementGrid.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-w / 2, 0, z), new THREE.Vector3(w / 2, 0, z)]), gridMaterial));
-            }
-            placementGrid.visible = false;
-            scene.add(placementGrid);
+        // --- Audio Init for MP3s ---
+        function initAudio() {
+            bgmLoop = document.getElementById('audio-bgm');
+            moveSound = document.getElementById('audio-move');
+            rotateSound = document.getElementById('audio-move'); 
+            gameOverSound = document.getElementById('audio-gameover');
+            // NEW: Get the line clear sound element
+            lineClearSound = document.getElementById('audio-lineclear');
+            
+            // Set volume
+            bgmLoop.volume = 0.3;
+            moveSound.volume = 0.8;
+            rotateSound.volume = 0.8;
+            gameOverSound.volume = 0.7;
+            if(lineClearSound) lineClearSound.volume = 0.7;
         }
 
-        // --- EVENT HANDLERS ---
+        // --- Helper function to play sounds ---
+        function playSound(audioElement) {
+            if (!audioElement) return;
+            audioElement.currentTime = 0; // Rewind to start
+            audioElement.play().catch(e => console.error("Sound play failed:", e));
+        }
+
+        // --- Game Loop ---
+        function animate(timestamp, frame) {
+            if (frame) {
+                const session = renderer.xr.getSession();
+                if (!session) {
+                    renderer.render(scene, camera);
+                    return;
+                }
+
+                if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
+                    if (hitTestSource) {
+                        const hitTestResults = frame.getHitTestResults(hitTestSource);
+                        if (hitTestResults.length > 0) {
+                            const hit = hitTestResults[0];
+                            const referenceSpace = renderer.xr.getReferenceSpace();
+                            const pose = hit.getPose(referenceSpace);
+                            
+                            placementGrid.matrix.fromArray(pose.transform.matrix);
+                            placementGrid.visible = true;
+                            scannerReticle.visible = false;
+                            
+                            if (gameState === GAME_STATE.SCANNING) {
+                                gameState = GAME_STATE.PLACING;
+                                updateMessage("Tap screen to lock floor");
+                            }
+                        } else {
+                            placementGrid.visible = false;
+                            scannerReticle.visible = true;
+                            const pose = frame.getViewerPose(renderer.xr.getReferenceSpace());
+                            if (pose) {
+                                const transform = new THREE.Matrix4().fromArray(pose.views[0].transform.matrix);
+                                const forward = new THREE.Vector3(0, 0, -1).applyMatrix4(transform);
+                                const position = new THREE.Vector3().setFromMatrixPosition(transform);
+                                scannerReticle.position.copy(position).add(forward.multiplyScalar(2));
+                                scannerReticle.lookAt(position);
+                            }
+                        }
+                    }
+                }
+            }
+            renderer.render(scene, camera);
+        }
+        
+        // --- Event Handlers ---
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function onSelect() {
-            if (gameState === GAME_STATE.PLACING) {
-                updateMessage("Starting Game...", true);
-                gameBoard.position.setFromMatrixPosition(placementGrid.matrix);
-                gameBoard.quaternion.setFromRotationMatrix(placementGrid.matrix);
-                gameBoard.translateZ(BOARD_HEIGHT / 2 * BLOCK_SIZE);
+        // --- Game State Functions ---
+        function updateMessage(message, autoHide = false) {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            if (autoHide) {
+                setTimeout(() => { messageBox.style.display = 'none'; }, 2000);
+            }
+        }
 
-                placementGrid.visible = false;
-                scannerReticle.visible = false;
-                scene.remove(placementGrid);
-                scene.remove(scannerReticle);
+        function startGame() {
+            gameState = GAME_STATE.PLAYING;
+            scoreBox.style.display = 'block';
+            updateScore(0);
+            gameBoard.applyMatrix4(placementGrid.matrix);
+            scene.add(gameBoard);
+            placementGrid.visible = false;
+            scannerReticle.visible = false;
+            spawnPiece();
+            gameLoopInterval = setInterval(gameTick, 1000);
+        }
 
-                if (hitTestSource) hitTestSource.cancel();
-                hitTestSource = null;
-                
-                gameState = GAME_STATE.PLAYING;
-                setTimeout(() => updateMessage("", false), 500);
-                scoreEl.style.display = 'block';
-                spawnNewPiece();
+        function gameTick() {
+            if (!currentPiece) return;
+            if (isValidMove(currentPiece, { y: -1 })) {
+                currentPiece.position.y -= BLOCK_SIZE;
+            } else {
+                lockPiece();
+                spawnPiece();
             }
         }
         
-        function onTouchStart(event) {
-            if (gameState !== GAME_STATE.PLAYING || !activePiece || activePiece.isFallingFromSky) return;
-
-            event.preventDefault();
-            const touch = event.touches[0];
-            const touchX = touch.clientX / window.innerWidth;
-            const now = Date.now();
-            let moved = false;
-
-            if (now - lastTapTime < 300) {
-                currentFallSpeed = fastDropSpeed;
-                moved = true;
-            } else {
-                if (touchX < 0.33) moved = moveActivePiece(-1, 0);
-                else if (touchX > 0.66) moved = moveActivePiece(1, 0);
-                else moved = rotateActivePiece();
-            }
+        function gameOver() {
+            clearInterval(gameLoopInterval);
+            gameState = GAME_STATE.GAME_OVER;
+            gameOverBox.style.display = 'block';
             
-            if (moved) {
-                // NEW: Haptic and Audio Feedback
-                if (navigator.vibrate) navigator.vibrate(50);
-                moveSound.triggerAttackRelease('C5', '32n');
-            }
-            
-            lastTapTime = now;
+            if (bgmLoop) bgmLoop.pause();
+            playSound(gameOverSound);
         }
 
-        function updateMessage(text, show = true) {
-            messageEl.classList.remove('game-over-msg');
-            if (show) {
-                messageEl.textContent = text;
-                messageEl.style.display = 'block';
-                messageEl.style.opacity = '1';
-            } else {
-                messageEl.style.opacity = '0';
-                setTimeout(() => { messageEl.style.display = 'none'; }, 300);
+        function updateScore(linesCleared) {
+            const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
+            if (linesCleared > 0) {
+                score += points[linesCleared] || 0;
+                
+                // --- NEW: Play line clear sound ---
+                playSound(lineClearSound);
+                
+                // Line Clear Flash Effect
+                const flash = document.createElement('div');
+                flash.style.position = 'absolute';
+                flash.style.top = '0';
+                flash.style.left = '0';
+                flash.style.width = '100%';
+                flash.style.height = '100%';
+                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                flash.style.zIndex = '999';
+                document.body.appendChild(flash);
+                setTimeout(() => document.body.removeChild(flash), 100);
             }
+            scoreBox.textContent = `Score: ${score}`;
         }
 
-        // --- GAME LOOP ---
-        function animate(timestamp, frame) {
-            if (frame) {
-                // --- NEW: Get session inside animate loop ---
-                const session = renderer.xr.getSession();
-                if (!session) {
-                    renderer.render(scene, camera);
-                    return; // No session, don't do anything else
+        // --- Piece Spawning and Logic ---
+        function spawnPiece() {
+            const typeIndex = Math.floor(Math.random() * SHAPES.length);
+            const rotationIndex = Math.floor(Math.random() * SHAPES[typeIndex].length);
+            const shape = SHAPES[typeIndex][rotationIndex];
+            const color = COLORS[typeIndex + 1];
+            
+            const piece = new THREE.Group();
+            piece.userData = {
+                shape: shape,
+                typeIndex: typeIndex,
+                rotationIndex: rotationIndex,
+                gridPos: {
+                    x: Math.floor((BOARD_WIDTH - shape[0].length) / 2),
+                    y: BOARD_HEIGHT + 2 
                 }
-                // --- End of new check ---
+            };
 
-                if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
+            const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+            const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+            const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+            const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const block = new THREE.Mesh(blockGeo, blockMat);
+                        const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                        block.add(bevel);
+                        block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
+                        piece.add(block);
+                    }
+                }
+            }
+
+            piece.position.set(
+                (piece.userData.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
+                (piece.userData.gridPos.y - BOARD_HEIGHT / 2 + 0.5) * BLOCK_SIZE,
+                0
+            );
+
+            const startY = piece.position.y;
+            const endY = (BOARD_HEIGHT / 2 - 0.5) * BLOCK_SIZE;
+            let dropTime = 0;
+
+            function dropAnimation() {
+                dropTime += 0.05;
+                const newY = THREE.MathUtils.lerp(startY, endY, dropTime);
+                piece.position.y = newY;
+                
+                if (dropTime < 1) {
+                    requestAnimationFrame(dropAnimation);
+                } else {
+                    piece.position.y = endY;
+                    if (!isValidMove(piece, { y: 0 })) {
+                        gameOver();
+                    }
+                }
+            }
+
+            scene.add(piece);
+            currentPiece = piece;
+            dropAnimation();
+        }
+        
+        function rotatePiece() {
+            if (!currentPiece) return;
+            
+            const ud = currentPiece.userData;
+            const newRotationIndex = (ud.rotationIndex + 1) % SHAPES[ud.typeIndex].length;
+            const newShape = SHAPES[ud.typeIndex][newRotationIndex];
+            
+            const kicks = [0, 1, -1, 2, -2]; 
+            for (const kick of kicks) {
+                const testPos = { x: ud.gridPos.x + kick, y: ud.gridPos.y };
+
+                if (isValidMove(currentPiece, { shape: newShape, pos: testPos })) {
+                    ud.rotationIndex = newRotationIndex;
+                    ud.shape = newShape;
+                    ud.gridPos.x += kick;
                     
-                    // --- THIS BLOCK IS REMOVED ---
-                    // if (!hitTestSource) {
-                    //     // --- FIX: Pass session to requestReferenceSpace ---
-                    //     session.requestReferenceSpace('viewer').then((referenceSpace) => {
-                    //         session.requestHitTestSource({ space: referenceSpace }).then((source) => {
-                    //             hitTestSource = source;
-                    //         });
-                    //     });
-                    // }
-                    // --- END REMOVED BLOCK ---
-
-                    if (hitTestSource) {
-                        const hitTestResults = frame.getHitTestResults(hitTestSource);
-                        if (hitTestResults.length > 0) {
-                            const hit = hitTestResults[0];
-                            const referenceSpace = renderer.xr.getReferenceSpace(); // This is fine
-                            const pose = hit.getPose(referenceSpace);
-                            placementGrid.matrix.fromArray(pose.transform.matrix);
-                            if(gameState === GAME_STATE.SCANNING) {
-                                gameState = GAME_STATE.PLACING;
-                                updateMessage("Tap screen to lock floor");
-                                scannerReticle.visible = false;
-                                placementGrid.visible = true;
-                            }
-                        } else if (gameState === GAME_STATE.SCANNING) {
-                            placementGrid.visible = false;
-                            scannerReticle.visible = true;
-                            const pose = frame.getViewerPose(renderer.xr.getReferenceSpace()); // This is fine
-                            if (pose) {
-                                const transform = new THREE.Matrix4().fromArray(pose.views[0].transform.matrix);
-                                const position = new THREE.Vector3().setFromMatrixPosition(transform);
-                                const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(new THREE.Matrix4().extractRotation(transform));
-                                position.addScaledVector(direction, 1.0); 
-                                scannerReticle.position.copy(position);
-                                scannerReticle.position.y -= 0.5;
+                    while (currentPiece.children.length) {
+                        currentPiece.remove(currentPiece.children[0]);
+                    }
+                    const color = COLORS[ud.typeIndex + 1];
+                    const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+                    const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+                    const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+                    const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
+                    for (let y = 0; y < newShape.length; y++) {
+                        for (let x = 0; x < newShape[y].length; x++) {
+                            if (newShape[y][x]) {
+                                const block = new THREE.Mesh(blockGeo, blockMat);
+                                const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                                block.add(bevel);
+                                block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
+                                currentPiece.add(block);
                             }
                         }
                     }
-                }
-                if (gameState === GAME_STATE.PLAYING) {
-                    updateGame(timestamp);
+                    
+                    currentPiece.position.x = (ud.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE;
+                    
+                    triggerHaptic(30);
+                    playSound(rotateSound);
+                    return; 
                 }
             }
-            renderer.render(scene, camera);
         }
         
-        // --- TETRIS GAME LOGIC ---
-        function updateGame(timestamp) {
-            if (!activePiece) return;
+        function hardDrop() {
+            if (!currentPiece) return;
+            
+            let dropAmount = 0;
+            while (isValidMove(currentPiece, { y: -(dropAmount + 1) })) {
+                dropAmount++;
+            }
+            
+            currentPiece.position.y -= dropAmount * BLOCK_SIZE;
+            
+            lockPiece();
+            spawnPiece();
+            
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(gameTick, 1000);
+            
+            triggerHaptic(50);
+            playSound(moveSound);
+        }
 
-            if (activePiece.isFallingFromSky) {
-                activePiece.position.y = Math.max(activePiece.targetY, activePiece.position.y - 0.05);
-                if (activePiece.position.y === activePiece.targetY) {
-                    activePiece.isFallingFromSky = false;
-                    lastFallTime = timestamp;
-                }
-            } 
-            else if (timestamp > lastFallTime + currentFallSpeed) {
-                if (!checkCollision(0, -1, activePiece.gridPos, activePiece.shape)) {
-                    activePiece.gridPos.y--;
-                    activePiece.targetY = activePiece.gridPos.y * BLOCK_SIZE;
-                    activePiece.position.y = activePiece.targetY;
-                } else {
-                    lockPiece();
-                    checkLineClears();
-                    spawnNewPiece(); 
-                    
-                    if (checkCollision(0, 0, activePiece.gridPos, activePiece.shape)) {
-                        gameState = GAME_STATE.GAME_OVER;
-                        updateMessage(`Game Over! Score: ${score}`, true);
-                        messageEl.classList.add('game-over-msg'); // NEW: Add red style
-                        activePiece.visible = false;
-                        activePiece = null;
-                        
-                        // NEW: Stop BGM and play lose sound
-                        bgmLoop.stop();
-                        Tone.Transport.stop();
-                        loseSound.triggerAttackRelease(['C4', 'A#3', 'G#3'], '4n');
+        // --- Collision and Grid Logic ---
+        function isValidMove(piece, delta) {
+            const ud = piece.userData;
+            const shape = delta.shape || ud.shape;
+            const newGridX = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
+            const newGridY = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
+
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const boardX = newGridX + x;
+                        const boardY = newGridY - y + (BOARD_HEIGHT - (piece.position.y / BLOCK_SIZE + BOARD_HEIGHT / 2 - 0.5));
+                        if (boardX < 0 || boardX >= BOARD_WIDTH) return false;
+                        if (boardY >= BOARD_HEIGHT) return false;
+                        if (boardY >= 0 && grid[boardY][boardX]) return false;
                     }
                 }
-                lastFallTime = timestamp;
             }
-        }
-        
-        function spawnNewPiece() {
-            const pieceNames = Object.keys(PIECES);
-            const randomPieceName = pieceNames[Math.floor(Math.random() * pieceNames.length)];
-            const pieceData = PIECES[randomPieceName];
-            
-            activePiece = new THREE.Group();
-            const material = MATERIALS[pieceData.type];
-            pieceData.shape.forEach(offset => {
-                activePiece.add(new THREE.Mesh(BLOCK_GEOMETRY, material).position.set(offset[0] * BLOCK_SIZE, offset[1] * BLOCK_SIZE, offset[2] * BLOCK_SIZE));
-            });
-            
-            activePiece.shape = pieceData.shape.map(arr => [...arr]);
-            activePiece.gridPos = { x: Math.floor(BOARD_WIDTH / 2), y: BOARD_HEIGHT - 2 };
-            activePiece.pieceType = pieceData.type;
-            activePiece.isFallingFromSky = true;
-            activePiece.position.set((activePiece.gridPos.x + 0.5) * BLOCK_SIZE, SPAWN_HEIGHT, 0.5 * BLOCK_SIZE);
-            activePiece.targetY = activePiece.gridPos.y * BLOCK_SIZE;
-            
-            gameBoard.add(activePiece);
-            currentFallSpeed = fallSpeed;
-        }
-
-        function moveActivePiece(dx, dy) {
-            if (!activePiece || checkCollision(dx, dy, activePiece.gridPos, activePiece.shape)) return false;
-            activePiece.gridPos.x += dx;
-            activePiece.gridPos.y += dy;
-            activePiece.position.x = (activePiece.gridPos.x + 0.5) * BLOCK_SIZE;
-            activePiece.targetY = activePiece.gridPos.y * BLOCK_SIZE;
-            activePiece.position.y = activePiece.targetY;
-            return true;
-        }
-        
-        function rotateActivePiece() {
-            if (!activePiece || activePiece.pieceType === 'O') return false;
-            const newShape = activePiece.shape.map(block => [block[1], -block[0], 0]);
-            if (checkCollision(0, 0, activePiece.gridPos, newShape)) return false;
-            
-            activePiece.shape = newShape;
-            activePiece.rotation.z -= Math.PI / 2;
             return true;
         }
 
-        function checkCollision(dx, dy, pos, shape) {
-            for (const block of shape) {
-                const gridX = pos.x + block[0] + dx;
-                const gridY = pos.y + block[1] + dy;
-                if (gridX < 0 || gridX >= BOARD_WIDTH || gridY < 0 || (gridY < BOARD_HEIGHT && grid[gridY][gridX])) return true;
-            }
-            return false;
-        }
-        
         function lockPiece() {
-            if (!activePiece) return;
-            for (const blockOffset of activePiece.shape) {
-                const gridX = activePiece.gridPos.x + blockOffset[0];
-                const gridY = activePiece.gridPos.y + blockOffset[1];
-                if (gridY < 0 || gridY >= BOARD_HEIGHT || gridX < 0 || gridX >= BOARD_WIDTH) continue;
-                const block = new THREE.Mesh(BLOCK_GEOMETRY, MATERIALS[activePiece.pieceType]);
-                block.position.set((gridX + 0.5) * BLOCK_SIZE, gridY * BLOCK_SIZE, 0.5 * BLOCK_SIZE);
-                gameBoard.add(block);
-                grid[gridY][gridX] = block;
+            if (!currentPiece) return;
+            
+            const ud = currentPiece.userData;
+            const shape = ud.shape;
+            const gridX = ud.gridPos.x;
+            const gridY = Math.round(BOARD_HEIGHT - (currentPiece.position.y / BLOCK_SIZE + BOARD_HEIGHT / 2 - 0.5));
+            
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const boardX = gridX + x;
+                        const boardY = gridY - y;
+                        
+                        if (boardY < 0) {
+                            gameOver();
+                            return;
+                        }
+                        
+                        grid[boardY][boardX] = ud.typeIndex + 1;
+                        
+                        const block = currentPiece.children.find(child => 
+                            Math.abs(child.position.x - x * BLOCK_SIZE) < 0.01 &&
+                            Math.abs(child.position.y - (-y * BLOCK_SIZE)) < 0.01
+                        );
+                        
+                        if (block) {
+                            const worldPos = new THREE.Vector3();
+                            block.getWorldPosition(worldPos);
+                            gameBoard.worldToLocal(worldPos);
+                            
+                            const color = COLORS[ud.typeIndex + 1];
+                            const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+                            const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+                            const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+                            const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+                
+                            const newBlock = new THREE.Mesh(blockGeo, blockMat);
+                            const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                            newBlock.add(newBevel);
+                            
+                            newBlock.position.copy(worldPos);
+                            newBlock.rotation.copy(currentPiece.rotation);
+                            gameBoard.add(newBlock);
+                        }
+                    }
+                }
             }
-            gameBoard.remove(activePiece);
-            activePiece.children.forEach(c => c.geometry.dispose());
-            activePiece = null;
+            
+            scene.remove(currentPiece);
+            currentPiece = null;
+            checkLineClears();
         }
-        
+
         function checkLineClears() {
             let linesCleared = 0;
-            for (let y = 0; y < BOARD_HEIGHT; y++) {
-                let isLineFull = true;
-                for (let x = 0; x < BOARD_WIDTH; x++) {
-                    if (!grid[y][x]) { isLineFull = false; break; }
-                }
-                if (isLineFull) {
+            let rowsToClear = [];
+            
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                if (grid[y].every(cell => cell > 0)) {
                     linesCleared++;
-                    for (let x = 0; x < BOARD_WIDTH; x++) {
-                        gameBoard.remove(grid[y][x]);
-                        grid[y][x].geometry.dispose();
-                    }
-                    for (let row = y; row < BOARD_HEIGHT - 1; row++) {
-                        for (let x = 0; x < BOARD_WIDTH; x++) {
-                            grid[row][x] = grid[row + 1][x];
-                            if (grid[row][x]) grid[row][x].position.y -= BLOCK_SIZE;
-                        }
-                    }
-                    grid[BOARD_HEIGHT - 1] = Array(BOARD_WIDTH).fill(null);
-                    y--;
+                    rowsToClear.push(y);
+                    gameBoard.children = gameBoard.children.filter(block => {
+                        const blockY = Math.round(BOARD_HEIGHT - (block.position.y / BLOCK_SIZE + BOARD_HEIGHT / 2 - 0.5));
+                        return blockY !== y;
+                    });
                 }
             }
+
             if (linesCleared > 0) {
-                const points = [0, 100, 300, 500, 800];
-                score += points[linesCleared] || points[4];
-                scoreEl.textContent = `Score: ${score}`;
-                fallSpeed = Math.max(150, fallSpeed * 0.9);
+                for (const y of rowsToClear) {
+                    grid.splice(y, 1);
+                }
+                for (let i = 0; i < linesCleared; i++) {
+                    grid.unshift(Array(BOARD_WIDTH).fill(0));
+                }
                 
-                // NEW: Sound and Visual Flash
-                lineClearSound.triggerAttackRelease('G5', '8n');
-                flashEl.classList.add('flash');
-                setTimeout(() => flashEl.classList.remove('flash'), 100);
+                gameBoard.children.forEach(block => {
+                    let blockY = Math.round(BOARD_HEIGHT - (block.position.y / BLOCK_SIZE + BOARD_HEIGHT / 2 - 0.5));
+                    let shift = 0;
+                    for (const clearedY of rowsToClear) {
+                        if (blockY < clearedY) {
+                            shift++;
+                        }
+                    }
+                    if (shift > 0) {
+                        block.position.y -= shift * BLOCK_SIZE;
+                    }
+                });
+                
+                updateScore(linesCleared);
             }
         }
     </script>
 </body>
 </html>
-
-
 
 

@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v20 - FINAL SCANNER FIX)</title>
+    <title>AR Tetris 3D (v21 - New Scanner Logic)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -131,7 +131,7 @@
     </script>
     
     <script type="module">
-        import * as THREE from 'three';
+        import *as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
         
         // --- Global Variables ---
@@ -180,8 +180,8 @@
         let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
         let audioUnlocked = false;
 
-        // --- FIX: Scanner Material (Green Only) ---
-        let greenGridMat;
+        // --- FIX: Scanner Materials ---
+        let blueGridMat, greenGridMat;
 
         // --- Haptics ---
         function triggerHaptic(duration = 20) {
@@ -216,8 +216,9 @@
             gameOverBox = document.getElementById('game-over-box');
 
             // --- AR Button Setup ---
+            // --- FIX: Requesting 'hit-test' (simple) not 'plane-detection' (complex) ---
             const arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['hit-test', 'local-floor', 'plane-detection'],
+                requiredFeatures: ['hit-test', 'local-floor'], 
                 optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
@@ -244,12 +245,12 @@
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Move phone to scan floor");
 
-                    // --- Request Hit Test for PLANES only ---
+                    // --- FIX: Requesting a simple 'viewer' hit test source ---
+                    // This is more reliable and finds *any* surface, not just planes.
                     const currentSession = renderer.xr.getSession();
                     currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
                         currentSession.requestHitTestSource({ 
-                            space: referenceSpace,
-                            entityTypes: ['plane'] // Only look for planes (floors/tables)
+                            space: referenceSpace 
                         }).then((source) => {
                             hitTestSource = source;
                         });
@@ -353,7 +354,13 @@
 
             window.addEventListener('resize', onWindowResize);
             
-            // --- FIX: Create scanner material ---
+            // --- Create scanner materials ---
+            blueGridMat = new THREE.MeshBasicMaterial({
+                color: 0x00FFFF, // Bright cyan (blue)
+                wireframe: true,
+                transparent: true,
+                opacity: 0.7
+            });
             greenGridMat = new THREE.MeshBasicMaterial({
                 color: 0x00FF00, // Bright green
                 wireframe: true,
@@ -369,8 +376,7 @@
                 BOARD_WIDTH 
             );
             
-            // --- FIX: Create mesh, not group ---
-            placementGrid = new THREE.Mesh(gridGeo, greenGridMat); // Start with green
+            placementGrid = new THREE.Mesh(gridGeo, blueGridMat); // Start with blue
             placementGrid.visible = false; // Start hidden
             scene.add(placementGrid);
             
@@ -435,42 +441,56 @@
                     return;
                 }
 
-                // --- FIX: New Scanning Logic (Green Mesh Only) ---
+                // --- FIX: New Blue-to-Green Scanner Logic ---
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (hitTestSource) {
+                        // This hit test is simpler and finds ANY surface
                         const hitTestResults = frame.getHitTestResults(hitTestSource); 
-                        
-                        let floorHit = null;
-                        for (const hit of hitTestResults) {
-                            const plane = hit.plane;
-                            if (plane && plane.orientation === 'horizontal') {
-                                floorHit = hit;
-                                break; 
-                            }
-                        }
 
-                        if (floorHit) {
-                            // --- FOUND FLOOR ---
+                        if (hitTestResults.length > 0) {
+                            // --- FOUND A SURFACE ---
+                            const hit = hitTestResults[0];
                             const referenceSpace = renderer.xr.getReferenceSpace();
-                            const pose = floorHit.getPose(referenceSpace);
+                            const pose = hit.getPose(referenceSpace);
                             
-                            // Update position and orientation
+                            // Update mesh position and orientation
                             placementGrid.matrix.fromArray(pose.transform.matrix);
                             placementGrid.matrixAutoUpdate = false; 
                             placementGrid.visible = true; // Show it
-                            
-                            // --- State Change Logic ---
-                            if (gameState === GAME_STATE.SCANNING) {
-                                gameState = GAME_STATE.PLACING;
-                                updateMessage("Tap screen to lock floor");
-                                triggerHaptic(50); // Vibrate
+
+                            // --- Check if it's flat (like a floor) ---
+                            // Get rotation as quaternion, convert to Euler to check 'pitch'
+                            const quat = new THREE.Quaternion().fromArray(pose.transform.orientation);
+                            const euler = new THREE.Euler().setFromQuaternion(quat, 'YXZ');
+
+                            // Check if the X-axis rotation (pitch) is roughly flat
+                            // -Math.PI / 2 is -90deg (perfectly flat). We allow some tolerance.
+                            const isFlat = euler.x > -Math.PI * 0.6 && euler.x < -Math.PI * 0.4;
+
+                            if (isFlat) {
+                                // --- IT'S A FLOOR ---
+                                if (gameState === GAME_STATE.SCANNING) {
+                                    // Just found it!
+                                    gameState = GAME_STATE.PLACING;
+                                    updateMessage("Tap screen to lock floor");
+                                    placementGrid.material = greenGridMat; // Turn Green
+                                    triggerHaptic(50); // Vibrate
+                                }
+                            } else {
+                                // --- IT'S A WALL OR OTHER SURFACE ---
+                                if (gameState === GAME_STATE.PLACING) {
+                                    // We *lost* the floor
+                                    gameState = GAME_STATE.SCANNING;
+                                    updateMessage("Move phone to scan floor");
+                                }
+                                placementGrid.material = blueGridMat; // Turn Blue
                             }
                         } else {
-                            // --- NO FLOOR FOUND ---
+                            // --- NO SURFACE FOUND ---
                             placementGrid.visible = false; // Hide it
                             
-                            // --- If we were placing, switch back to scanning ---
                             if (gameState === GAME_STATE.PLACING) {
+                                // We lost the target
                                 gameState = GAME_STATE.SCANNING;
                                 updateMessage("Move phone to scan floor");
                             }
@@ -661,7 +681,7 @@ function updateScore(linesCleared) {
                     const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
             
                     for (let y = 0; y < newShape.length; y++) {
-                        for (let x = 0; x < shape[y].length; x++) {
+                        for (let x = 0; x < newShape.length; x++) {
                             if (newShape[y][x]) {
                                 const block = new THREE.Mesh(blockGeo, blockMat);
                                 const bevel = new THREE.LineSegments(bevelGeo, bevelMat);

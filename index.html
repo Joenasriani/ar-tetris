@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v19 - Correct Scanner)</title>
+    <title>AR Tetris 3D (v20 - FINAL SCANNER FIX)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -180,8 +180,8 @@
         let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
         let audioUnlocked = false;
 
-        // --- FIX: Scanner Materials ---
-        let blueGridMat, greenGridMat;
+        // --- FIX: Scanner Material (Green Only) ---
+        let greenGridMat;
 
         // --- Haptics ---
         function triggerHaptic(duration = 20) {
@@ -353,18 +353,12 @@
 
             window.addEventListener('resize', onWindowResize);
             
-            // --- FIX: Create scanner materials ---
-            blueGridMat = new THREE.MeshBasicMaterial({
-                color: 0x00FFFF, // Bright cyan (blue)
-                wireframe: true,
-                transparent: true,
-                opacity: 0.7
-            });
+            // --- FIX: Create scanner material ---
             greenGridMat = new THREE.MeshBasicMaterial({
                 color: 0x00FF00, // Bright green
                 wireframe: true,
                 transparent: true,
-                opacity: 0.8 // Slightly more opaque
+                opacity: 0.8 
             });
 
             // --- Scanner Mesh (10x10 square base) ---
@@ -376,8 +370,8 @@
             );
             
             // --- FIX: Create mesh, not group ---
-            placementGrid = new THREE.Mesh(gridGeo, blueGridMat); // Start with blue
-            placementGrid.visible = false;
+            placementGrid = new THREE.Mesh(gridGeo, greenGridMat); // Start with green
+            placementGrid.visible = false; // Start hidden
             scene.add(placementGrid);
             
             gameBoard = new THREE.Group();
@@ -441,12 +435,9 @@
                     return;
                 }
 
-                // --- FIX: New Scanning Logic with Floating Blue Mesh ---
+                // --- FIX: New Scanning Logic (Green Mesh Only) ---
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (hitTestSource) {
-                        
-                        placementGrid.visible = true; // Always visible when scanning/placing
-
                         const hitTestResults = frame.getHitTestResults(hitTestSource); 
                         
                         let floorHit = null;
@@ -463,43 +454,28 @@
                             const referenceSpace = renderer.xr.getReferenceSpace();
                             const pose = floorHit.getPose(referenceSpace);
                             
-                            // 1. Snap to floor
+                            // Update position and orientation
                             placementGrid.matrix.fromArray(pose.transform.matrix);
                             placementGrid.matrixAutoUpdate = false; 
+                            placementGrid.visible = true; // Show it
                             
-                            // 2. Check if state needs to change
+                            // --- State Change Logic ---
                             if (gameState === GAME_STATE.SCANNING) {
                                 gameState = GAME_STATE.PLACING;
                                 updateMessage("Tap screen to lock floor");
-                                placementGrid.material = greenGridMat; // Turn Green
                                 triggerHaptic(50); // Vibrate
                             }
                         } else {
-                            // --- NO FLOOR FOUND (Floating Reticle) ---
+                            // --- NO FLOOR FOUND ---
+                            placementGrid.visible = false; // Hide it
                             
-                            // 1. Reset matrix to identity
-                            placementGrid.matrix.identity();
-                            placementGrid.matrixAutoUpdate = true; // Let THREE.js handle it
-                            // 2. Clone camera's world matrix
-                            placementGrid.matrix.copy(camera.matrixWorld);
-                            // 3. Translate it 1.5m in front of the camera
-                            placementGrid.matrix.premultiply(new THREE.Matrix4().makeTranslation(0, 0, -1.5));
-                            // 4. Rotate it to be flat
-                            placementGrid.matrix.premultiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
-                            
-                            placementGrid.updateMatrixWorld(true); // Force update
-
-                            // 5. Check if state needs to change
+                            // --- If we were placing, switch back to scanning ---
                             if (gameState === GAME_STATE.PLACING) {
-                                // We *lost* the floor
                                 gameState = GAME_STATE.SCANNING;
                                 updateMessage("Move phone to scan floor");
-                                placementGrid.material = blueGridMat; // Turn Blue
                             }
                         }
                     }
-                } else {
-                    placementGrid.visible = false; // Hide if playing or game over
                 }
             }
             renderer.render(scene, camera);
@@ -538,7 +514,7 @@
             
             scene.add(gameBoard);
             
-            placementGrid.visible = false;
+            placementGrid.visible = false; // Hide green mesh
             
             spawnPiece();
             gameLoopInterval = setInterval(gameTick, 1000);
@@ -685,7 +661,7 @@ function updateScore(linesCleared) {
                     const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
             
                     for (let y = 0; y < newShape.length; y++) {
-                        for (let x = 0; x < newShape[y].length; x++) {
+                        for (let x = 0; x < shape[y].length; x++) {
                             if (newShape[y][x]) {
                                 const block = new THREE.Mesh(blockGeo, blockMat);
                                 const bevel = new THREE.LineSegments(bevelGeo, bevelMat);

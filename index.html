@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v15 - Floor Lock Fix)</title>
+    <title>AR Tetris 3D (v16 - Vertical Lock Fix)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -104,24 +104,28 @@
 </head>
 
 <body>
+    <!-- UI Elements -->
     <div id="message-box" class="ui-element">Move phone to scan floor</div>
     <div id="game-over-box" class="ui-element">GAME OVER</div>
     <div id="score-box" class="ui-element" style="display: none;">Score: 0</div>
 
+    <!-- The fancy AR button (icon removed) -->
     <button id="custom-ar-button">
         Launch AR
     </button>
     
+    <!-- HTML Audio Elements -->
     <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="/music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto" playsinline></audio>
 
+    <!-- JavaScript Libraries -->
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
             }
         }
     </script>
@@ -237,10 +241,9 @@
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Move phone to scan floor");
 
-                    // --- FIX: Request Hit Test for PLANES only ---
+                    // --- Request Hit Test for PLANES only ---
                     const currentSession = renderer.xr.getSession();
                     currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
-                        // This is the critical change
                         currentSession.requestHitTestSource({ 
                             space: referenceSpace,
                             entityTypes: ['plane'] // Only look for planes (floors/tables)
@@ -347,12 +350,12 @@
 
             window.addEventListener('resize', onWindowResize);
             
-            // --- New Scanner Mesh (10x2 base) ---
+            // --- FIX: New Scanner Mesh (10x10 square base) ---
             const gridGeo = new THREE.PlaneGeometry(
                 BOARD_WIDTH * BLOCK_SIZE, 
-                2 * BLOCK_SIZE, // Only 2 blocks deep
+                BOARD_WIDTH * BLOCK_SIZE, // Was 2 * BLOCK_SIZE
                 BOARD_WIDTH, 
-                2
+                BOARD_WIDTH // Was 2
             );
             const gridMat = new THREE.MeshBasicMaterial({
                 color: 0x00FFFF, // Bright cyan
@@ -365,7 +368,8 @@
             
             placementGrid = new THREE.Group();
             placementGrid.add(wireframeGrid);
-            placementGrid.matrixAutoUpdate = false;
+            // --- FIX: Remove matrixAutoUpdate = false ---
+            // We will set position and rotation manually in the animate loop
             placementGrid.visible = false;
             scene.add(placementGrid);
             
@@ -390,7 +394,7 @@
             
             sounds.forEach(sound => {
                 if (sound) {
-                    sound.load(); // Load the file
+                    sound.load(); 
                     const playPromise = sound.play();
                     if (playPromise !== undefined) {
                         playPromise.then(() => {
@@ -430,18 +434,27 @@
                     return;
                 }
 
-                // --- Scanning Logic (Mesh Only) ---
+                // --- FIX: New Scanning Logic (Stable & Facing User) ---
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (hitTestSource) {
-                        // --- FIX: Use .getResults() which respects the 'plane' entityType ---
                         const hitTestResults = frame.getHitTestResults(hitTestSource); 
                         if (hitTestResults.length > 0) {
-                            // Plane found, show MESH
                             const hit = hitTestResults[0];
                             const referenceSpace = renderer.xr.getReferenceSpace();
                             const pose = hit.getPose(referenceSpace);
                             
-                            placementGrid.matrix.fromArray(pose.transform.matrix);
+                            // 1. Get position from hit test
+                            placementGrid.position.copy(pose.transform.position);
+
+                            // 2. Make it flat (rotate -90deg on X)
+                            placementGrid.rotation.x = -Math.PI / 2;
+
+                            // 3. Make it face the camera (use camera's Y rotation)
+                            // We set Z to 0 to prevent it from tilting up/down
+                            placementGrid.rotation.y = camera.rotation.y;
+                            placementGrid.rotation.z = 0; 
+                            
+                            placementGrid.updateMatrix(); // Apply these changes
                             placementGrid.visible = true;
                             
                             if (gameState === GAME_STATE.SCANNING) {
@@ -449,7 +462,6 @@
                                 updateMessage("Tap screen to lock floor");
                             }
                         } else {
-                            // No plane found, hide MESH
                             placementGrid.visible = false;
                         }
                     }
@@ -479,13 +491,21 @@
             scoreBox.style.display = 'block';
             updateScore(0);
             
-            // --- Vertical Placement Logic ---
+            // --- FIX: New Vertical Placement Logic ---
             const depthOffset = -0.5; // Push 50cm "away" from user
             const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; // Lift board up by half its height
 
-            gameBoard.applyMatrix4(placementGrid.matrix);
-            gameBoard.rotation.x = -Math.PI / 2;
+            // 1. Copy the stable position and rotation from the placement grid
+            gameBoard.position.copy(placementGrid.position);
+            gameBoard.rotation.copy(placementGrid.rotation);
+            
+            // 2. Rotate it to stand up (local X axis)
+            gameBoard.rotateX(-Math.PI / 2);
+            
+            // 3. Lift it so its base is on the floor (local Y is now "up")
             gameBoard.translateY(baseLift);
+            
+            // 4. Push it back from the camera (local Z is now "away")
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
@@ -800,3 +820,5 @@ function updateScore(linesCleared) {
         }
     </script></body>
 </html>
+
+

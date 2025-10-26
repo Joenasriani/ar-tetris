@@ -278,11 +278,19 @@
             document.body.appendChild(arButton);
 
             // --- NEW: Custom Button Logic ---
-            customArButton.addEventListener('click', () => {
-                // Just click the real button.
-                // The ARButton.js library will handle calling Tone.start()
-                // and requesting the session.
-                arButton.click();
+            customArButton.addEventListener('click', async () => {
+                try {
+                    // This is the user gesture that unlocks audio.
+                    await Tone.start();
+                    console.log("Audio context started.");
+                    
+                    // Now that audio is unlocked, click the real AR button.
+                    arButton.click();
+                } catch (e) {
+                    console.error("Could not start audio:", e);
+                    // Even if audio fails, try to start AR.
+                    arButton.click();
+                }
             });
 
             // --- NEW: Listen for AR session start ---
@@ -303,6 +311,16 @@
 
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Move phone to scan floor");
+
+                    // --- NEW: Create Hit Test Source HERE ---
+                    // Get the session from the renderer
+                    const currentSession = renderer.xr.getSession();
+                    currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
+                        currentSession.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                            hitTestSource = source;
+                        });
+                    });
+                    // --- End of new code ---
                 }
             });
             // --- End of new listener ---
@@ -426,14 +444,18 @@
                 // --- End of new check ---
 
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
-                    if (!hitTestSource) {
-                        // --- FIX: Pass session to requestReferenceSpace ---
-                        session.requestReferenceSpace('viewer').then((referenceSpace) => {
-                            session.requestHitTestSource({ space: referenceSpace }).then((source) => {
-                                hitTestSource = source;
-                            });
-                        });
-                    }
+                    
+                    // --- THIS BLOCK IS REMOVED ---
+                    // if (!hitTestSource) {
+                    //     // --- FIX: Pass session to requestReferenceSpace ---
+                    //     session.requestReferenceSpace('viewer').then((referenceSpace) => {
+                    //         session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                    //             hitTestSource = source;
+                    //         });
+                    //     });
+                    // }
+                    // --- END REMOVED BLOCK ---
+
                     if (hitTestSource) {
                         const hitTestResults = frame.getHitTestResults(hitTestSource);
                         if (hitTestResults.length > 0) {
@@ -612,6 +634,7 @@
     </script>
 </body>
 </html>
+
 
 
 

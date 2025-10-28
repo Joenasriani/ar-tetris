@@ -54,6 +54,7 @@
         #message-box {
             top: 30px;
             display: none; /* Hidden by default */
+            max-width: 90%;
         }
         
         /* Game Over message */
@@ -100,6 +101,34 @@
             transform: translateX(-50%) scale(1.05);
             box-shadow: 0 8px 25px rgba(65, 105, 225, 0.7);
         }
+        
+        /* --- NEW: Gemini Tip Button --- */
+        #gemini-tip-button {
+            position: absolute;
+            top: calc(50% + 50px); /* Below Game Over */
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 20px;
+            border-radius: 20px;
+            background: linear-gradient(145deg, #1e90ff, #00bfff);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
+            cursor: pointer;
+            z-index: 101;
+            transition: all 0.3s ease;
+            pointer-events: auto; /* Clickable */
+            display: none; /* Hidden by default */
+        }
+        
+        #gemini-tip-button:disabled {
+            background: #555;
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
     </style>
 </head>
 
@@ -113,6 +142,14 @@
     <button id="custom-ar-button">
         Launch AR
     </button>
+    
+    <!-- NEW: Gemini Tip Button -->
+    <button id="gemini-tip-button">
+        ✨ Get Tip
+    </button>
+    
+    <!-- NEW: Audio element for playing back TTS -->
+    <audio id="audio-tts" preload="auto" playsinline></audio>
     
     <!-- HTML Audio Elements -->
     <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
@@ -143,7 +180,7 @@
         let gameLoopInterval = null;
         
         // UI Elements
-        let customArButton, messageBox, scoreBox, gameOverBox;
+        let customArButton, messageBox, scoreBox, gameOverBox, geminiTipButton;
         
         // Game state
         const GAME_STATE = {
@@ -177,7 +214,7 @@
         };
 
         // --- Audio Variables ---
-        let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
+        let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound, ttsAudio;
         let audioUnlocked = false;
 
         // --- FIX: Scanner Materials ---
@@ -210,15 +247,18 @@
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
             
+            // --- Grab UI Elements ---
             customArButton = document.getElementById('custom-ar-button');
             messageBox = document.getElementById('message-box');
             scoreBox = document.getElementById('score-box');
             gameOverBox = document.getElementById('game-over-box');
+            geminiTipButton = document.getElementById('gemini-tip-button');
+            ttsAudio = document.getElementById('audio-tts');
 
             // --- AR Button Setup ---
-            // --- FIX: Requesting 'hit-test' (simple) not 'plane-detection' (complex) ---
+            // --- FIX: Simplified requiredFeatures to just 'hit-test' for wider compatibility ---
             const arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['hit-test', 'local-floor'], 
+                requiredFeatures: ['hit-test'], 
                 optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
@@ -230,6 +270,13 @@
                 console.log("Custom button clicked, triggering real AR button.");
                 initAudioAndUnlock(); 
                 arButton.click(); 
+            });
+            
+            // --- NEW: Gemini Button Listener ---
+            geminiTipButton.addEventListener('click', () => {
+                geminiTipButton.disabled = true;
+                geminiTipButton.textContent = "Working on it...";
+                getGeminiTip();
             });
 
             // --- Listen for AR session start ---
@@ -245,8 +292,7 @@
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Move phone to scan floor");
 
-                    // --- FIX: Requesting a simple 'viewer' hit test source ---
-                    // This is more reliable and finds *any* surface, not just planes.
+                    // --- Requesting a simple 'viewer' hit test source ---
                     const currentSession = renderer.xr.getSession();
                     currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
                         currentSession.requestHitTestSource({ 
@@ -397,7 +443,8 @@
             gameOverSound = document.getElementById('audio-gameover');
             lineClearSound = document.getElementById('audio-lineclear');
             
-            const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound];
+            // Add TTS audio to the list
+            const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound, ttsAudio];
             
             sounds.forEach(sound => {
                 if (sound) {
@@ -421,6 +468,7 @@
             rotateSound.volume = 0.8;
             gameOverSound.volume = 0.7;
             if(lineClearSound) lineClearSound.volume = 0.7;
+            ttsAudio.volume = 1.0;
             
             audioUnlocked = true;
         }
@@ -496,6 +544,8 @@
                             }
                         }
                     }
+                } else { // Hide grid if playing or game over
+                    placementGrid.visible = false;
                 }
             }
             renderer.render(scene, camera);
@@ -534,7 +584,7 @@
             
             scene.add(gameBoard);
             
-            placementGrid.visible = false; // Hide green mesh
+            placementGrid.visible = false; 
             
             spawnPiece();
             gameLoopInterval = setInterval(gameTick, 1000);
@@ -556,6 +606,7 @@
             clearInterval(gameLoopInterval);
             gameState = GAME_STATE.GAME_OVER;
             gameOverBox.style.display = 'block';
+            geminiTipButton.style.display = 'block'; // --- NEW: Show Gemini button
             
             if (bgmLoop) bgmLoop.pause();
             playSound(gameOverSound);
@@ -681,7 +732,7 @@ function updateScore(linesCleared) {
                     const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
             
                     for (let y = 0; y < newShape.length; y++) {
-                        for (let x = 0; x < newShape.length; x++) {
+                        for (let x = 0; x < shape[y].length; x++) {
                             if (newShape[y][x]) {
                                 const block = new THREE.Mesh(blockGeo, blockMat);
                                 const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
@@ -842,6 +893,171 @@ function updateScore(linesCleared) {
                 updateScore(linesCleared);
             }
         }
+        
+        // --- NEW: Gemini API Functions ---
+        
+        /**
+         * Calls the Gemini API to get a Tetris tip.
+         */
+        async function getGeminiTip() {
+            updateMessage("✨ Coach is thinking...");
+            const userPrompt = `I just played Tetris and my final score was ${score}. Give me one short, encouraging, and actionable tip to improve my score next time. Be concise, like a game coach. Max 20 words.`;
+            const apiKey = ""; // API key is handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }]
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const tip = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (tip) {
+                    updateMessage(`✨ Coach says: "${tip}"`);
+                    speakTip(tip); // Call the TTS function
+                } else {
+                    updateMessage("Couldn't get a tip right now.");
+                }
+
+            } catch (error) {
+                console.error("Gemini tip error:", error);
+                updateMessage("Error connecting to the coach.");
+            } finally {
+                // Re-enable button even if there's an error
+                geminiTipButton.disabled = false;
+                geminiTipButton.textContent = "✨ Get Tip";
+            }
+        }
+        
+        /**
+         * Calls the Gemini TTS API to speak the provided text.
+         */
+        async function speakTip(textToSpeak) {
+            const apiKey = ""; // API key is handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{
+                    parts: [{ text: `Say this like a friendly game coach: ${textToSpeak}` }]
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: "Puck" } // A friendly, upbeat voice
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`TTS API Error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    ttsAudio.src = audioUrl;
+                    ttsAudio.play();
+                } else {
+                    throw new Error("Invalid TTS audio data received.");
+                }
+
+            } catch (error) {
+                console.error("Gemini TTS error:", error);
+                // Fail silently, the text tip is already visible
+            }
+        }
+        
+        // --- NEW: Helper functions for TTS Audio ---
+        
+        /**
+         * Converts a Base64 string to an ArrayBuffer.
+         */
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /**
+         * Converts raw PCM audio data to a playable WAV Blob.
+         */
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+            const blockAlign = numChannels * bitsPerSample / 8;
+            const dataSize = pcmData.length * 2; // 16-bit = 2 bytes per sample
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            // RIFF header
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            // 'fmt ' sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // Sub-chunk size (16 for PCM)
+            view.setUint16(20, 1, true); // Audio format (1 for PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            // 'data' sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // Write PCM data
+            for (let i = 0; i < pcmData.length; i++) {
+                view.setInt16(44 + i * 2, pcmData[i], true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        /**
+         * Helper to write a string to a DataView.
+         */
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+        
     </script></body>
 </html>
 

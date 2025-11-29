@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v28 - Rock & Metal Vibe)</title>
+    <title>AR Tetris 3D (v29 - Robust Floor Scanner)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -142,6 +142,722 @@
     <button id="gemini-tip-button">
         ✨ Get Tip
     </button>
+    
+    <!-- Audio -->
+    <audio id="audio-tts" preload="auto" playsinline></audio>
+    <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
+    <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-gameover" src="/music/outro.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto" playsinline></audio>
+
+    <!-- Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        
+        // --- Global Variables ---
+        let camera, scene, renderer;
+        let hitTestSource = null;
+        let placementGrid = null; 
+        let gameBoard = null; 
+        let currentPiece = null;
+        let gameLoopInterval = null;
+        
+        let customArButton, messageBox, scoreBox, gameOverBox, geminiTipButton;
+        
+        const GAME_STATE = {
+            INITIALIZING: 0,
+            SCANNING: 1,
+            PLACING: 2,
+            PLAYING: 3,
+            GAME_OVER: 4
+        };
+        let gameState = GAME_STATE.INITIALIZING;
+        let score = 0;
+
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20; 
+        const BLOCK_SIZE = 0.1; 
+        
+        let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+        
+        const SHAPES = [
+            [[[1,1,1,1]], [[1],[1],[1],[1]]],
+            [[[1,1],[1,1]]],
+            [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]],
+            [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]],
+            [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]],
+            [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]],
+            [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]
+        ];
+        const COLORS = {
+            1: 0x00F0F0, 2: 0xF0F000, 3: 0xA000F0, 4: 0x00F000, 5: 0xF00000, 6: 0x0000F0, 7: 0xF0A000,
+        };
+
+        let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound, ttsAudio;
+        let audioUnlocked = false;
+        let blueGridMat, greenGridMat;
+
+        function triggerHaptic(duration = 20) {
+            if (navigator.vibrate) navigator.vibrate(duration);
+        }
+        
+        init();
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+            light.position.set(0.5, 1, 0.25);
+            scene.add(light);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+            directionalLight.position.set(0, 10, 0);
+            scene.add(directionalLight);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            
+            customArButton = document.getElementById('custom-ar-button');
+            messageBox = document.getElementById('message-box');
+            scoreBox = document.getElementById('score-box');
+            gameOverBox = document.getElementById('game-over-box');
+            geminiTipButton = document.getElementById('gemini-tip-button');
+            ttsAudio = document.getElementById('audio-tts');
+
+            const arButton = ARButton.createButton(renderer, {
+                requiredFeatures: ['hit-test'], 
+                optionalFeatures: ['dom-overlay', 'local-floor'], 
+                domOverlay: { root: document.body }
+            });
+            arButton.id = "default-ar-button"; 
+            document.body.appendChild(arButton);
+
+            customArButton.addEventListener('click', () => {
+                initAudioAndUnlock();
+                if (bgmLoop) {
+                    bgmLoop.play().catch(e => console.error("BGM play failed:", e));
+                }
+                arButton.click(); 
+            });
+            
+            geminiTipButton.addEventListener('click', () => {
+                geminiTipButton.disabled = true;
+                geminiTipButton.textContent = "Working on it...";
+                getGeminiTip();
+            });
+
+            renderer.xr.addEventListener('sessionstart', () => {
+                if (gameState === GAME_STATE.INITIALIZING) {
+                    if (!audioUnlocked) initAudioAndUnlock(); 
+                    if (bgmLoop && bgmLoop.paused) {
+                        bgmLoop.play().catch(e => console.error("BGM error:", e));
+                    }
+                    
+                    customArButton.style.display = 'none';
+                    gameState = GAME_STATE.SCANNING;
+                    updateMessage("Move phone to scan floor");
+
+                    const currentSession = renderer.xr.getSession();
+                    currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
+                        currentSession.requestHitTestSource({ 
+                            space: referenceSpace 
+                        }).then((source) => {
+                            hitTestSource = source;
+                        });
+                    });
+                }
+            });
+            
+            renderer.xr.addEventListener('sessionend', () => {
+                if (bgmLoop) bgmLoop.pause();
+                window.location.reload();
+            });
+
+            // Touch Controls
+            let touchStartX, touchStartY, touchStartTime;
+            let strafeInterval = null;
+            let isDragging = false;
+            const DRAG_THRESHOLD_Y = 75; 
+            const STRAFE_INTERVAL_MS = 130; 
+
+            function onTouchStart(e) {
+                e.preventDefault(); 
+                if (gameState === GAME_STATE.PLACING) {
+                    updateMessage("Starting Game...", true);
+                    startGame();
+                    return; 
+                }
+                if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) return; 
+
+                if (strafeInterval) clearInterval(strafeInterval);
+                const touch = e.touches[0];
+                touchStartX = touch.pageX;
+                touchStartY = touch.pageY;
+                touchStartTime = new Date().getTime();
+                isDragging = false;
+
+                const screenWidth = window.innerWidth;
+                if (touchStartX < screenWidth * 0.33) {
+                    movePiece(-1); 
+                    strafeInterval = setInterval(() => movePiece(-1), STRAFE_INTERVAL_MS);
+                } else if (touchStartX > screenWidth * 0.66) {
+                    movePiece(1); 
+                    strafeInterval = setInterval(() => movePiece(1), STRAFE_INTERVAL_MS);
+                }
+            }
+            
+            function onTouchMove(e) {
+                e.preventDefault();
+                if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) return;
+                
+                const touch = e.touches[0];
+                const deltaY = touch.pageY - touchStartY;
+                
+                if (deltaY > DRAG_THRESHOLD_Y) {
+                    if (strafeInterval) clearInterval(strafeInterval); 
+                    hardDrop();
+                    touchStartY = null; 
+                    touchStartX = null;
+                    isDragging = true; 
+                }
+            }
+            
+            function onTouchEnd(e) {
+                e.preventDefault();
+                if (gameState !== GAME_STATE.PLAYING) return;
+                if (strafeInterval) clearInterval(strafeInterval);
+                if (isDragging) { isDragging = false; return; }
+                
+                const screenWidth = window.innerWidth;
+                const touchTime = new Date().getTime() - touchStartTime;
+
+                if (touchTime < STRAFE_INTERVAL_MS * 1.5) { 
+                    if (touchStartX > screenWidth * 0.33 && touchStartX < screenWidth * 0.66) {
+                        rotatePiece();
+                    }
+                }
+            }
+            
+            renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+            renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
+            renderer.domElement.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+            window.addEventListener('resize', onWindowResize);
+            
+            // Materials
+            blueGridMat = new THREE.MeshBasicMaterial({ color: 0x00FFFF, wireframe: true, transparent: true, opacity: 0.7 });
+            greenGridMat = new THREE.MeshBasicMaterial({ color: 0x00FF00, wireframe: true, transparent: true, opacity: 0.8 });
+
+            // Scanner Mesh
+            const gridGeo = new THREE.PlaneGeometry(BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH, BOARD_WIDTH);
+            placementGrid = new THREE.Mesh(gridGeo, blueGridMat);
+            placementGrid.visible = false;
+            
+            // Rotate the geometry so it lies flat on the XZ plane by default
+            gridGeo.rotateX(-Math.PI / 2);
+
+            scene.add(placementGrid);
+            
+            gameBoard = new THREE.Group();
+            renderer.setAnimationLoop(animate);
+        }
+
+        function initAudioAndUnlock() {
+            if (audioUnlocked) return; 
+            
+            bgmLoop = document.getElementById('audio-bgm');
+            moveSound = document.getElementById('audio-move');
+            rotateSound = document.getElementById('audio-move'); 
+            gameOverSound = document.getElementById('audio-gameover');
+            lineClearSound = document.getElementById('audio-lineclear');
+            
+            const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound, ttsAudio];
+            
+            sounds.forEach(sound => {
+                if (sound) {
+                    sound.load(); 
+                    const playPromise = sound.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            sound.pause();
+                            sound.currentTime = 0;
+                        }).catch(e => { console.warn("Audio unlock warning:", e); });
+                    }
+                }
+            });
+
+            bgmLoop.volume = 0.3;
+            moveSound.volume = 0.8;
+            rotateSound.volume = 0.8;
+            gameOverSound.volume = 0.7;
+            if(lineClearSound) lineClearSound.volume = 0.7;
+            ttsAudio.volume = 1.0;
+            
+            audioUnlocked = true;
+        }
+
+        function playSound(audioElement) {
+            if (!audioElement || !audioUnlocked) return;
+            audioElement.currentTime = 0; 
+            audioElement.play().catch(e => console.warn("Sound play warning:", e)); 
+        }
+
+        function animate(timestamp, frame) {
+            if (frame) {
+                const session = renderer.xr.getSession();
+                if (!session) {
+                    renderer.render(scene, camera);
+                    return;
+                }
+
+                if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
+                    if (hitTestSource) {
+                        const hitTestResults = frame.getHitTestResults(hitTestSource); 
+
+                        if (hitTestResults.length > 0) {
+                            const hit = hitTestResults[0];
+                            const referenceSpace = renderer.xr.getReferenceSpace();
+                            const pose = hit.getPose(referenceSpace);
+                            
+                            // Apply full transform to the mesh
+                            placementGrid.matrix.fromArray(pose.transform.matrix);
+                            placementGrid.matrixAutoUpdate = false; 
+                            placementGrid.visible = true; 
+
+                            // Check floor normal
+                            const normalY = pose.transform.matrix[5]; 
+                            const isFloor = normalY > 0.85;
+
+                            if (isFloor) {
+                                if (gameState === GAME_STATE.SCANNING) {
+                                    gameState = GAME_STATE.PLACING;
+                                    updateMessage("Tap screen to lock floor");
+                                    placementGrid.material = greenGridMat; 
+                                    triggerHaptic(50); 
+                                }
+                            } else {
+                                if (gameState === GAME_STATE.PLACING) {
+                                    gameState = GAME_STATE.SCANNING;
+                                    updateMessage("Move phone to scan floor");
+                                }
+                                placementGrid.material = blueGridMat; 
+                            }
+                        } else {
+                            placementGrid.visible = false; 
+                            if (gameState === GAME_STATE.PLACING) {
+                                gameState = GAME_STATE.SCANNING;
+                                updateMessage("Move phone to scan floor");
+                            }
+                        }
+                    }
+                }
+            }
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function updateMessage(message, autoHide = false) {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            if (autoHide) {
+                setTimeout(() => { messageBox.style.display = 'none'; }, 2000);
+            }
+        }
+
+        function startGame() {
+            gameState = GAME_STATE.PLAYING;
+            scoreBox.style.display = 'block';
+            updateScore(0);
+            
+            const depthOffset = -0.5; 
+            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
+
+            // 1. Copy the position from the placement grid
+            // We do NOT copy the rotation, because we want it perfectly upright
+            const targetPos = new THREE.Vector3();
+            targetPos.setFromMatrixPosition(placementGrid.matrix);
+            
+            gameBoard.position.copy(targetPos);
+            
+            // 2. Rotate the board to face the user (Y-rotation only)
+            // This ensures it's upright relative to the world up vector (0,1,0)
+            const cameraPos = new THREE.Vector3();
+            camera.getWorldPosition(cameraPos);
+            
+            // Look at the camera, but ignore Y difference (stay vertical)
+            gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
+            
+            // 3. Apply offsets
+            gameBoard.translateY(baseLift);
+            gameBoard.translateZ(depthOffset);
+            
+            scene.add(gameBoard);
+            placementGrid.visible = false; 
+            spawnPiece();
+            gameLoopInterval = setInterval(gameTick, 1000);
+        }
+
+        function gameTick() {
+            if (!currentPiece) return;
+            if (isValidMove(currentPiece, { y: 1 })) {
+                currentPiece.userData.gridPos.y += 1;
+                updatePiecePosition(currentPiece);
+            } else {
+                lockPiece();
+                spawnPiece();
+            }
+        }
+        
+        function gameOver() {
+            clearInterval(gameLoopInterval);
+            gameState = GAME_STATE.GAME_OVER;
+            gameOverBox.style.display = 'block';
+            geminiTipButton.style.display = 'block';
+            if (bgmLoop) bgmLoop.pause();
+            playSound(gameOverSound);
+        }
+
+        function updateScore(linesCleared) {
+            const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
+            if (linesCleared > 0) {
+                score += points[linesCleared] || 0;
+                playSound(lineClearSound);
+                const flash = document.createElement('div');
+                flash.style.position = 'absolute';
+                flash.style.top = '0';
+                flash.style.left = '0';
+                flash.style.width = '100%';
+                flash.style.height = '100%';
+                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                flash.style.zIndex = '999';
+                flash.style.pointerEvents = 'none'; 
+                document.body.appendChild(flash);
+                setTimeout(() => document.body.removeChild(flash), 100);
+            }
+            scoreBox.textContent = `Score: ${score}`;
+        }
+        
+        function movePiece(direction) {
+            if (!currentPiece) return;
+            if (isValidMove(currentPiece, { x: direction })) {
+                currentPiece.userData.gridPos.x += direction;
+                updatePiecePosition(currentPiece);
+                triggerHaptic(20);
+                playSound(moveSound);
+            }
+        }
+        
+        function updatePiecePosition(piece) {
+            const ud = piece.userData;
+            piece.position.set(
+                (ud.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
+                (BOARD_HEIGHT / 2 - 0.5 - ud.gridPos.y) * BLOCK_SIZE,
+                0 
+            );
+        }
+
+        function spawnPiece() {
+            const typeIndex = Math.floor(Math.random() * SHAPES.length);
+            const rotationIndex = 0; 
+            const shape = SHAPES[typeIndex][rotationIndex];
+            const color = COLORS[typeIndex + 1];
+            
+            const piece = new THREE.Group();
+            piece.userData = { shape: shape, typeIndex: typeIndex, rotationIndex: rotationIndex, gridPos: { x: Math.floor((BOARD_WIDTH - shape[0].length) / 2), y: 0 } };
+            
+            const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+            const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+            const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+            const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const block = new THREE.Mesh(blockGeo, blockMat);
+                        const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                        block.add( bevel );
+                        block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
+                        piece.add(block);
+                    }
+                }
+            }
+            updatePiecePosition(piece);
+            gameBoard.add(piece);
+            currentPiece = piece;
+            if (!isValidMove(currentPiece, {})) gameOver();
+        }
+        
+        function rotatePiece() {
+            if (!currentPiece) return;
+            const ud = currentPiece.userData;
+            const newRotationIndex = (ud.rotationIndex + 1) % SHAPES[ud.typeIndex].length;
+            const newShape = SHAPES[ud.typeIndex][newRotationIndex];
+            const kicks = [0, 1, -1, 2, -2]; 
+            for (const kick of kicks) {
+                const testPos = { x: ud.gridPos.x + kick, y: ud.gridPos.y };
+                if (isValidMove(currentPiece, { shape: newShape, pos: testPos })) {
+                    ud.rotationIndex = newRotationIndex;
+                    ud.shape = newShape;
+                    ud.gridPos.x = testPos.x; 
+                    while (currentPiece.children.length) currentPiece.remove(currentPiece.children[0]);
+                    
+                    const color = COLORS[ud.typeIndex + 1];
+                    const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+                    const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+                    const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+                    const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
+                    for (let y = 0; y < newShape.length; y++) {
+                        for (let x = 0; x < newShape[y].length; x++) {
+                            if (newShape[y][x]) {
+                                const block = new THREE.Mesh(blockGeo, blockMat);
+                                const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                                block.add(bevel);
+                                block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
+                                currentPiece.add(block);
+                            }
+                        }
+                    }
+                    updatePiecePosition(currentPiece);
+                    triggerHaptic(30);
+                    playSound(rotateSound);
+                    return; 
+                }
+            }
+        }
+        
+        function hardDrop() {
+            if (!currentPiece) return;
+            while (isValidMove(currentPiece, { y: 1 })) {
+                currentPiece.userData.gridPos.y += 1;
+            }
+            updatePiecePosition(currentPiece);
+            lockPiece();
+            spawnPiece();
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(gameTick, 1000);
+            triggerHaptic(50);
+            playSound(moveSound); 
+        }
+
+        function isValidMove(piece, delta) {
+            const ud = piece.userData;
+            const shape = delta.shape || ud.shape;
+            const newGridX = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
+            const newGridY = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
+
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const boardX = newGridX + x;
+                        const boardY = newGridY + y; 
+                        if (boardX < 0 || boardX >= BOARD_WIDTH) return false;
+                        if (boardY >= BOARD_HEIGHT) return false;
+                        if (boardY >= 0 && grid[boardY][boardX]) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function lockPiece() {
+            if (!currentPiece) return;
+            const ud = currentPiece.userData;
+            const shape = ud.shape;
+            const gridX = ud.gridPos.x;
+            const gridY = ud.gridPos.y; 
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const boardX = gridX + x;
+                        const boardY = gridY + y;
+                        if (boardY < 0 || boardY >= BOARD_HEIGHT) continue; 
+                        grid[boardY][boardX] = ud.typeIndex + 1;
+                        
+                        const color = COLORS[ud.typeIndex + 1];
+                        const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+                        const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
+                        const bevelGeo = new THREE.EdgesGeometry(blockGeo);
+                        const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+                        const newBlock = new THREE.Mesh(blockGeo, blockMat);
+                        const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
+                        newBlock.add(newBevel);
+                        
+                        newBlock.position.set(
+                            (boardX - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
+                            (BOARD_HEIGHT / 2 - 0.5 - boardY) * BLOCK_SIZE,
+                            0
+                        );
+                        gameBoard.add(newBlock);
+                    }
+                }
+            }
+            gameBoard.remove(currentPiece);
+            currentPiece = null;
+            checkLineClears();
+        }
+
+        function checkLineClears() {
+            let linesCleared = 0;
+            let rowsToClear = [];
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                if (grid[y].every(cell => cell > 0)) {
+                    linesCleared++;
+                    rowsToClear.push(y);
+                }
+            }
+            if (linesCleared > 0) {
+                gameBoard.children = gameBoard.children.filter(block => {
+                    if (block === currentPiece) return true; 
+                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                    return !rowsToClear.includes(blockY); 
+                });
+                for (const y of rowsToClear.sort((a, b) => a - b)) { 
+                    grid.splice(y, 1);
+                    grid.unshift(Array(BOARD_WIDTH).fill(0));
+                }
+                gameBoard.children.forEach(block => {
+                    if (block === currentPiece) return; 
+                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                    let shift = 0;
+                    for (const clearedY of rowsToClear) {
+                        if (blockY < clearedY) shift++;
+                    }
+                    if (shift > 0) block.position.y -= shift * BLOCK_SIZE;
+                });
+                updateScore(linesCleared);
+            }
+        }
+        
+        async function getGeminiTip() {
+            updateMessage("✨ Coach is thinking...");
+            const userPrompt = `I just played Tetris and my final score was ${score}. Give me one short, encouraging, and actionable tip to improve my score next time. Be concise, like a game coach. Max 20 words.`;
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const payload = { contents: [{ parts: [{ text: userPrompt }] }] };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                const result = await response.json();
+                const tip = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (tip) {
+                    updateMessage(`✨ Coach says: "${tip}"`);
+                    speakTip(tip); 
+                } else {
+                    updateMessage("Couldn't get a tip right now.");
+                }
+            } catch (error) {
+                console.error("Gemini tip error:", error);
+                updateMessage("Error connecting to the coach.");
+            } finally {
+                geminiTipButton.disabled = false;
+                geminiTipButton.textContent = "✨ Get Tip";
+            }
+        }
+        
+        async function speakTip(textToSpeak) {
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: `Say this like a friendly game coach: ${textToSpeak}` }] }],
+                generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`TTS API Error: ${response.statusText}`);
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    ttsAudio.src = audioUrl;
+                    ttsAudio.play();
+                } else {
+                    throw new Error("Invalid TTS audio data received.");
+                }
+            } catch (error) {
+                console.error("Gemini TTS error:", error);
+            }
+        }
+        
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+            const blockAlign = numChannels * bitsPerSample / 8;
+            const dataSize = pcmData.length * 2; 
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); 
+            view.setUint16(20, 1, true); 
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+            for (let i = 0; i < pcmData.length; i++) view.setInt16(44 + i * 2, pcmData[i], true);
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    </script></body>
+</html>
+
+
     
     <!-- Audio - Pointing to same paths, user needs to update files -->
     <audio id="audio-tts" preload="auto" playsinline></audio>

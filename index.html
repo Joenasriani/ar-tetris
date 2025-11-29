@@ -246,7 +246,11 @@
             document.body.appendChild(arButton);
 
             customArButton.addEventListener('click', () => {
-                initAudioAndUnlock(); 
+                initAudioAndUnlock();
+                // Play music on start
+                if (bgmLoop) {
+                    bgmLoop.play().catch(e => console.error("BGM play failed:", e));
+                }
                 arButton.click(); 
             });
             

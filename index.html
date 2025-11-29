@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v27 - Perfect Vertical Alignment)</title>
+    <title>AR Tetris 3D (v28 - Rock & Metal Vibe)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -143,7 +143,7 @@
         ✨ Get Tip
     </button>
     
-    <!-- Audio -->
+    <!-- Audio - Pointing to same paths, user needs to update files -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
     <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
@@ -239,7 +239,7 @@
 
             const arButton = ARButton.createButton(renderer, {
                 requiredFeatures: ['hit-test'], 
-                optionalFeatures: ['dom-overlay'], 
+                optionalFeatures: ['dom-overlay', 'local-floor'], 
                 domOverlay: { root: document.body }
             });
             arButton.id = "default-ar-button"; 
@@ -361,10 +361,6 @@
 
             // Scanner Mesh
             const gridGeo = new THREE.PlaneGeometry(BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH, BOARD_WIDTH);
-            
-            // Correct geometry orientation for floor
-            gridGeo.rotateX(-Math.PI / 2); 
-
             placementGrid = new THREE.Mesh(gridGeo, blueGridMat);
             placementGrid.visible = false;
             scene.add(placementGrid);
@@ -430,12 +426,10 @@
                             const referenceSpace = renderer.xr.getReferenceSpace();
                             const pose = hit.getPose(referenceSpace);
                             
-                            // Apply scanner transform
                             placementGrid.matrix.fromArray(pose.transform.matrix);
                             placementGrid.matrixAutoUpdate = false; 
                             placementGrid.visible = true; 
 
-                            // Check floor normal
                             const normalY = pose.transform.matrix[5]; 
                             const isFloor = normalY > 0.85;
 
@@ -443,15 +437,15 @@
                                 if (gameState === GAME_STATE.SCANNING) {
                                     gameState = GAME_STATE.PLACING;
                                     updateMessage("Tap screen to lock floor");
+                                    placementGrid.material = greenGridMat; 
                                     triggerHaptic(50); 
                                 }
-                                placementGrid.material = greenGridMat;
                             } else {
                                 if (gameState === GAME_STATE.PLACING) {
                                     gameState = GAME_STATE.SCANNING;
                                     updateMessage("Move phone to scan floor");
                                 }
-                                placementGrid.material = blueGridMat;
+                                placementGrid.material = blueGridMat; 
                             }
                         } else {
                             placementGrid.visible = false; 
@@ -485,27 +479,16 @@
             scoreBox.style.display = 'block';
             updateScore(0);
             
-            // --- FIX: Absolute Vertical Alignment ---
-            
-            // 1. Get ONLY the position from the floor scan
-            const targetPos = new THREE.Vector3();
-            targetPos.setFromMatrixPosition(placementGrid.matrix);
-            
-            gameBoard.position.copy(targetPos);
-            
-            // 2. Make it stand perfectly vertical and face the camera
-            // We look at the camera's X and Z, but keep the board's own Y level
-            gameBoard.lookAt(camera.position.x, gameBoard.position.y, camera.position.z);
-            
-            // 3. Adjust for height and depth
-            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
             const depthOffset = -0.5; 
-            
+            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
+
+            gameBoard.applyMatrix4(placementGrid.matrix);
+            gameBoard.rotateX(-Math.PI / 2);
+            // gameBoard.rotation.y = camera.rotation.y; // removed to strictly follow floor orientation
             gameBoard.translateY(baseLift);
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
-            
             placementGrid.visible = false; 
             spawnPiece();
             gameLoopInterval = setInterval(gameTick, 1000);

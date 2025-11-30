@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v39 - Intro & Polish)</title>
+    <title>AR Tetris 3D (v39 - Lower Music Volume)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -214,19 +214,19 @@
             fill: white;
         }
         
-        /* --- NEW: Intro Screen Styles --- */
+        /* Intro Screen Styles */
         #intro-screen {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            display: none; /* Hidden by default */
+            display: none; 
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent black */
-            z-index: 200; /* On top of everything */
+            background-color: rgba(0, 0, 0, 0.7); 
+            z-index: 200; 
             opacity: 0;
             transition: opacity 0.5s ease-in-out;
         }
@@ -234,7 +234,7 @@
         #intro-title {
             font-family: 'TetrisBlocks', sans-serif;
             font-size: 3rem;
-            color: #FF00FF; /* Neon Magenta */
+            color: #FF00FF; 
             text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000;
             margin-bottom: 10px;
             text-align: center;
@@ -245,7 +245,7 @@
             font-family: 'Roboto', sans-serif;
             font-weight: 300;
             font-size: 1.2rem;
-            color: #00FFFF; /* Cyan */
+            color: #00FFFF; 
             text-shadow: 0 0 5px #00FFFF;
             letter-spacing: 4px;
             text-transform: uppercase;
@@ -266,7 +266,7 @@
     <div id="score-box" class="ui-element">Score: 0</div>
     <div id="level-box" class="ui-element">Level: 1</div>
 
-    <!-- NEW: Intro Screen -->
+    <!-- Intro Screen -->
     <div id="intro-screen">
         <div id="intro-title">ROCKIN' TETRIS</div>
         <div id="intro-subtitle">in AR</div>
@@ -327,7 +327,6 @@
         let customArButton, messageBox, scoreBox, levelBox, gameOverBox, geminiTipButton, replayButton, musicToggleBtn;
         let iconSoundOn, iconSoundOff;
         
-        // --- NEW: Intro Elements ---
         let introScreen;
         
         const GAME_STATE = {
@@ -340,7 +339,6 @@
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
         
-        // --- Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
         let currentDropSpeed = 1000; 
@@ -402,7 +400,6 @@
             replayButton = document.getElementById('replay-button');
             ttsAudio = document.getElementById('audio-tts');
             
-            // --- Intro Elements ---
             introScreen = document.getElementById('intro-screen');
             
             musicToggleBtn = document.getElementById('music-toggle');
@@ -423,7 +420,6 @@
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
-            // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
                 console.log("Unlocking audio context...");
                 const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
@@ -464,6 +460,9 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
+                    // --- NEW: Lower Initial Volume (40% of 0.3 which was original) ---
+                    if (bgmLoop) bgmLoop.volume = 0.12; 
+                    
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
@@ -488,7 +487,6 @@
                 window.location.reload();
             });
 
-            // Touch Controls
             let touchStartX, touchStartY, touchStartTime;
             let strafeInterval = null;
             let isDragging = false;
@@ -500,8 +498,8 @@
 
                 e.preventDefault(); 
                 if (gameState === GAME_STATE.PLACING) {
-                    updateMessage(""); // Clear tap message
-                    playIntroAndStart(); // --- Start Intro Sequence ---
+                    updateMessage(""); 
+                    playIntroAndStart(); 
                     return; 
                 }
                 if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) return; 
@@ -564,16 +562,13 @@
 
             window.addEventListener('resize', onWindowResize);
             
-            // Materials
             blueGridMat = new THREE.MeshBasicMaterial({ color: 0x00FFFF, wireframe: true, transparent: true, opacity: 0.7 });
             greenGridMat = new THREE.MeshBasicMaterial({ color: 0x00FF00, wireframe: true, transparent: true, opacity: 0.8 });
 
-            // Scanner Mesh
             const gridGeo = new THREE.PlaneGeometry(BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH, BOARD_WIDTH);
             placementGrid = new THREE.Mesh(gridGeo, blueGridMat);
             placementGrid.visible = false;
             
-            // Rotate the geometry so it lies flat on the XZ plane by default
             gridGeo.rotateX(-Math.PI / 2);
 
             scene.add(placementGrid);
@@ -669,9 +664,7 @@
             }
         }
 
-        // --- NEW: Intro Sequence Function ---
         function playIntroAndStart() {
-            // 1. Lock the board position immediately
             const depthOffset = -0.5; 
             const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
 
@@ -689,24 +682,21 @@
             scene.add(gameBoard);
             placementGrid.visible = false; 
             
-            // 2. Show Intro Screen
             introScreen.style.display = 'flex';
             
-            // Fade In
             setTimeout(() => {
                 introScreen.style.opacity = '1';
-            }, 50); // Slight delay to ensure display:flex applies first
+            }, 50); 
 
-            // 3. Wait, then Fade Out and Start Game
             setTimeout(() => {
                 introScreen.style.opacity = '0';
                 
                 setTimeout(() => {
                     introScreen.style.display = 'none';
                     startGame();
-                }, 500); // Wait for fade out transition (0.5s)
+                }, 500); 
                 
-            }, 2500); // Show intro for 2.5 seconds
+            }, 2500); 
         }
 
         function startGame() {
@@ -995,6 +985,8 @@
                 updateScore(linesCleared);
             }
         }
+        
+        // --- NEW: Gemini API Functions ---
         
         async function getGeminiTip() {
             updateMessage("✨ Coach is thinking...");

@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v52 - Record Label)</title>
+    <title>AR Tetris 3D (v53 - Audio Fade Out)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -31,6 +31,7 @@
             touch-action: none; 
         }
 
+        /* The 3D canvas */
         canvas {
             display: block;
             width: 100%;
@@ -234,16 +235,16 @@
             100% { transform: scale(1); }
         }
         
-        /* --- NEW: Record Label --- */
+        /* Record Label */
         #record-label {
             position: absolute;
-            top: 80px; /* Align with record button */
-            right: 65px; /* Left of the button */
+            top: 80px; 
+            right: 65px; 
             color: rgba(255, 255, 255, 0.7);
-            font-size: 0.6rem; /* Very small font */
+            font-size: 0.6rem; 
             font-weight: 300;
             text-transform: uppercase;
-            display: none; /* Hidden initially */
+            display: none; 
             pointer-events: none;
             text-align: right;
             text-shadow: 0 0 2px black;
@@ -322,14 +323,15 @@
 
     <!-- Recording Button -->
     <button id="record-button" aria-label="Record Video">
+        <!-- Circle Icon for Record -->
         <svg id="icon-record" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="8" />
         </svg>
+        <!-- Square Icon for Stop (hidden by default) -->
         <svg id="icon-stop" viewBox="0 0 24 24" style="display: none;">
             <rect x="6" y="6" width="12" height="12" />
         </svg>
     </button>
-    <!-- NEW: Label -->
     <div id="record-label">click to record</div>
 
     <button id="custom-ar-button">
@@ -391,6 +393,7 @@
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
         
+        // --- Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
         let currentDropSpeed = 1000; 
@@ -476,7 +479,7 @@
             iconRecord = document.getElementById('icon-record');
             iconStop = document.getElementById('icon-stop');
             recordingIndicator = document.getElementById('recording-indicator');
-            recordLabel = document.getElementById('record-label'); // Get label
+            recordLabel = document.getElementById('record-label');
 
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
@@ -492,6 +495,7 @@
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
+            // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
                 console.log("Unlocking audio context...");
                 if(audioCtx.state === 'suspended') audioCtx.resume();
@@ -540,11 +544,12 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
+                    // Volume Settings (all very low)
                     if (bgmLoop) bgmLoop.volume = 0.05; 
                     if (moveSound) moveSound.volume = 0.15; 
                     if (rotateSound) rotateSound.volume = 0.15; 
-                    if (gameOverSound) gameOverSound.volume = 0.1; 
-                    if (lineClearSound) lineClearSound.volume = 0.1; 
+                    if (gameOverSound) gameOverSound.volume = 0.1; // Very Low
+                    if (lineClearSound) lineClearSound.volume = 0.1; // Very Low
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -552,7 +557,7 @@
                     
                     customArButton.style.display = 'none';
                     recordButton.style.display = 'flex';
-                    recordLabel.style.display = 'block'; // Show label
+                    recordLabel.style.display = 'block'; 
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Scan floor to start");
 
@@ -571,7 +576,7 @@
                 if (bgmLoop) bgmLoop.pause();
                 if (isRecording) stopRecording();
                 recordButton.style.display = 'none';
-                recordLabel.style.display = 'none'; // Hide label
+                recordLabel.style.display = 'none'; 
                 window.location.reload();
             });
 
@@ -682,13 +687,12 @@
             mediaRecorder.start();
             isRecording = true;
             
-            // UI Update
             recordButton.classList.add('recording');
             iconRecord.style.display = 'none';
             iconStop.style.display = 'block';
             recordingIndicator.style.display = 'block'; 
-            recordLabel.style.display = 'none'; // Hide label when recording starts
-
+            recordLabel.style.display = 'none'; 
+            
             updateMessage("Recording Started...");
             setTimeout(() => { if(gameState === GAME_STATE.PLAYING) updateMessage("", true) }, 1500);
         }
@@ -697,14 +701,11 @@
             if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
                 isRecording = false;
-                
-                // UI Update
                 recordButton.classList.remove('recording');
                 iconRecord.style.display = 'block';
                 iconStop.style.display = 'none';
                 recordingIndicator.style.display = 'none'; 
-                recordLabel.style.display = 'block'; // Show label again
-                
+                recordLabel.style.display = 'block'; 
                 updateMessage("Processing video...");
             }
         }
@@ -886,41 +887,77 @@
             }
         }
         
+        // --- Music Fade Out ---
+        function fadeOutMusic(callback) {
+            if (!bgmLoop || bgmLoop.paused) {
+                if (callback) callback();
+                return;
+            }
+            
+            const fadeDuration = 1000; // 1 second
+            const steps = 20;
+            const stepTime = fadeDuration / steps;
+            const volStep = bgmLoop.volume / steps;
+
+            let currentStep = 0;
+            const fadeInterval = setInterval(() => {
+                currentStep++;
+                if (bgmLoop.volume > volStep) {
+                    bgmLoop.volume -= volStep;
+                } else {
+                    bgmLoop.volume = 0;
+                    bgmLoop.pause();
+                    bgmLoop.currentTime = 0; // Reset for next time
+                    bgmLoop.volume = 0.05; // Reset volume for next play
+                    clearInterval(fadeInterval);
+                    if (callback) callback();
+                }
+            }, stepTime);
+        }
+
         function gameOver() {
             clearInterval(gameLoopInterval);
             gameState = GAME_STATE.GAME_OVER;
             gameOverBox.style.display = 'block';
             replayButton.style.display = 'block'; 
             
-            if (bgmLoop) bgmLoop.pause();
-            playSound(gameOverSound);
+            // Fade out music then play outro
+            fadeOutMusic(() => {
+                 if (isMusicMuted) return; 
+                 playSound(gameOverSound);
+            });
         }
 
         function resetGame() {
-            gameOverBox.style.display = 'none';
-            replayButton.style.display = 'none';
-            
-            for (let i = gameBoard.children.length - 1; i >= 0; i--) {
-                const child = gameBoard.children[i];
-                gameBoard.remove(child);
-            }
-            grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
-            score = 0;
-            
-            linesClearedTotal = 0;
-            level = 1;
-            currentDropSpeed = 1000;
-            updateScore(0); 
-            levelBox.textContent = `Level: ${level}`;
+            // Fade out first
+            fadeOutMusic(() => {
+                gameOverBox.style.display = 'none';
+                replayButton.style.display = 'none';
+                
+                for (let i = gameBoard.children.length - 1; i >= 0; i--) {
+                    const child = gameBoard.children[i];
+                    gameBoard.remove(child);
+                }
+                grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+                score = 0;
+                
+                linesClearedTotal = 0;
+                level = 1;
+                currentDropSpeed = 1000;
+                updateScore(0); 
+                levelBox.textContent = `Level: ${level}`;
 
-            if (bgmLoop && !isMusicMuted) {
-                bgmLoop.currentTime = 0;
-                bgmLoop.play().catch(e => console.error("BGM restart failed:", e));
-            }
+                // Restart Music
+                if (bgmLoop && !isMusicMuted) {
+                    bgmLoop.volume = 0.05; // Ensure correct volume
+                    bgmLoop.currentTime = 0;
+                    bgmLoop.play().catch(e => console.error("BGM restart failed:", e));
+                }
 
-            gameState = GAME_STATE.PLAYING;
-            spawnPiece();
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                gameState = GAME_STATE.SCANNING; // Go back to scanning!
+                updateMessage("Scan floor to start");
+                placementGrid.visible = false; 
+            });
         }
 
         function updateScore(linesCleared) {
@@ -956,71 +993,6 @@
             scoreBox.textContent = `Score: ${score}`;
         }
         
-        function checkLineClears() {
-            let linesCleared = 0;
-            let rowsToClear = [];
-            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
-                if (grid[y].every(cell => cell > 0)) {
-                    linesCleared++;
-                    rowsToClear.push(y);
-                }
-            }
-            
-            if (linesCleared > 0) {
-                clearInterval(gameLoopInterval);
-
-                const blocksToAnimate = [];
-                gameBoard.children.forEach(block => {
-                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                    if (rowsToClear.includes(blockY)) {
-                        blocksToAnimate.push(block);
-                    }
-                });
-
-                let progress = 0;
-                const duration = 1000; 
-                const startTime = Date.now();
-
-                function animateClear() {
-                    const now = Date.now();
-                    progress = (now - startTime) / duration;
-
-                    if (progress < 1) {
-                        blocksToAnimate.forEach(b => {
-                            b.scale.setScalar(1 - progress);
-                            b.rotation.y += 0.2; 
-                            b.rotation.z += 0.1;
-                        });
-                        requestAnimationFrame(animateClear);
-                    } else {
-                        gameBoard.children = gameBoard.children.filter(block => {
-                            if (block === currentPiece) return true; 
-                            const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                            return !rowsToClear.includes(blockY); 
-                        });
-                        for (const y of rowsToClear.sort((a, b) => a - b)) { 
-                            grid.splice(y, 1);
-                            grid.unshift(Array(BOARD_WIDTH).fill(0));
-                        }
-                        gameBoard.children.forEach(block => {
-                            if (block === currentPiece) return; 
-                            const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                            let shift = 0;
-                            for (const clearedY of rowsToClear) {
-                                if (blockY < clearedY) shift++;
-                            }
-                            if (shift > 0) block.position.y -= shift * BLOCK_SIZE;
-                        });
-                        
-                        updateScore(linesCleared);
-                        
-                        gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-                    }
-                }
-                animateClear();
-            }
-        }
-
         function movePiece(direction) {
             if (!currentPiece) return;
             if (isValidMove(currentPiece, { x: direction })) {
@@ -1044,12 +1016,15 @@
             const rotationIndex = 0; 
             const shape = SHAPES[typeIndex][rotationIndex];
             const color = COLORS[typeIndex + 1];
+            
             const piece = new THREE.Group();
             piece.userData = { shape: shape, typeIndex: typeIndex, rotationIndex: rotationIndex, gridPos: { x: Math.floor((BOARD_WIDTH - shape[0].length) / 2), y: 0 } };
+            
             const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
             const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
             const bevelGeo = new THREE.EdgesGeometry(blockGeo);
             const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
             for (let y = 0; y < shape.length; y++) {
                 for (let x = 0; x < shape[y].length; x++) {
                     if (shape[y][x]) {
@@ -1080,11 +1055,13 @@
                     ud.shape = newShape;
                     ud.gridPos.x = testPos.x; 
                     while (currentPiece.children.length) currentPiece.remove(currentPiece.children[0]);
+                    
                     const color = COLORS[ud.typeIndex + 1];
                     const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
                     const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
                     const bevelGeo = new THREE.EdgesGeometry(blockGeo);
                     const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            
                     for (let y = 0; y < newShape.length; y++) {
                         for (let x = 0; x < newShape[y].length; x++) {
                             if (newShape[y][x]) {
@@ -1122,6 +1099,7 @@
             const shape = delta.shape || ud.shape;
             const newGridX = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
             const newGridY = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
+
             for (let y = 0; y < shape.length; y++) {
                 for (let x = 0; x < shape[y].length; x++) {
                     if (shape[y][x]) {
@@ -1149,6 +1127,7 @@
                         const boardY = gridY + y;
                         if (boardY < 0 || boardY >= BOARD_HEIGHT) continue; 
                         grid[boardY][boardX] = ud.typeIndex + 1;
+                        
                         const color = COLORS[ud.typeIndex + 1];
                         const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
                         const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
@@ -1157,6 +1136,7 @@
                         const newBlock = new THREE.Mesh(blockGeo, blockMat);
                         const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
                         newBlock.add(newBevel);
+                        
                         newBlock.position.set(
                             (boardX - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
                             (BOARD_HEIGHT / 2 - 0.5 - boardY) * BLOCK_SIZE,

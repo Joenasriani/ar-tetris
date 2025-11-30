@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v47 - Low SFX & Animation)</title>
+    <title>AR Tetris 3D (v45 - Montserrat & Low Audio)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -11,12 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
-        /* --- Load Custom Font (Unused but kept for reference) --- */
-        @font-face {
-            font-family: 'TetrisBlocks';
-            src: url('font/TetrisBlocks-P99g.ttf') format('truetype');
-        }
-
         /* Basic reset */
         body, html {
             width: 100%;
@@ -474,12 +468,15 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // --- LOWERED VOLUME (80% reduction from original 1.0) ---
-                    if (bgmLoop) bgmLoop.volume = 0.2; // Reduced volume
-                    if (moveSound) moveSound.volume = 0.2; 
-                    if (rotateSound) rotateSound.volume = 0.2; 
-                    if (gameOverSound) gameOverSound.volume = 0.4; // Slightly louder but still reduced
-                    if (lineClearSound) lineClearSound.volume = 0.4;
+                    // --- LOWERED VOLUME ---
+                    if (bgmLoop) bgmLoop.volume = 0.12; // Very low for background
+                    
+                    // --- LOWERED SFX VOLUME ---
+                    if (moveSound) moveSound.volume = 0.2; // Very low
+                    if (rotateSound) rotateSound.volume = 0.2; // Very low
+                    // Keep Game Over and Line Clear slightly louder but still low
+                    if (gameOverSound) gameOverSound.volume = 0.3;
+                    if (lineClearSound) lineClearSound.volume = 0.3;
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -701,7 +698,7 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
-            // Treat floor as a bit lower than detected (-0.08)
+            // --- NEW: Treat floor as a bit lower than detected (-0.08m) ---
             gameBoard.translateY(baseLift - 0.08); 
             gameBoard.translateZ(depthOffset);
             
@@ -809,32 +806,17 @@
                 }
 
                 playSound(lineClearSound);
-                
-                // --- Animation Effect for Line Clear ---
-                // Create a flashing plane for each cleared line
-                // Since we don't know exactly which lines were cleared here without passing them,
-                // we will create a general flash effect on the whole board or just a screen flash.
-                // A screen flash is simpler and effective.
                 const flash = document.createElement('div');
                 flash.style.position = 'absolute';
                 flash.style.top = '0';
                 flash.style.left = '0';
                 flash.style.width = '100%';
                 flash.style.height = '100%';
-                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
+                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
                 flash.style.zIndex = '999';
                 flash.style.pointerEvents = 'none'; 
-                flash.style.transition = 'opacity 0.5s ease-out'; // Fade out over 0.5s
                 document.body.appendChild(flash);
-                
-                // Trigger reflow
-                void flash.offsetWidth;
-                
-                // Start fade out
-                flash.style.opacity = '0';
-
-                // Remove after animation
-                setTimeout(() => document.body.removeChild(flash), 500);
+                setTimeout(() => document.body.removeChild(flash), 100);
             }
             scoreBox.textContent = `Score: ${score}`;
         }
@@ -939,7 +921,7 @@
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
-            // playSound(moveSound); // Disabled on hard drop too
+            // playSound(moveSound); // Sound disabled on hard drop as well
         }
 
         function isValidMove(piece, delta) {
@@ -1139,5 +1121,3 @@
         }
     </script></body>
 </html>
-
-

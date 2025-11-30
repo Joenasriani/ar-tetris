@@ -11,6 +11,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
+        /* --- Load Custom Font (Unused but kept for reference) --- */
+        @font-face {
+            font-family: 'TetrisBlocks';
+            src: url('font/TetrisBlocks-P99g.ttf') format('truetype');
+        }
+
         /* Basic reset */
         body, html {
             width: 100%;
@@ -682,10 +688,13 @@
             if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
                 isRecording = false;
+                
+                // Update UI
                 recordButton.classList.remove('recording');
                 iconRecord.style.display = 'block';
                 iconStop.style.display = 'none';
                 recordingIndicator.style.display = 'none'; 
+                
                 updateMessage("Processing video...");
             }
         }
@@ -788,6 +797,7 @@
                         }
                     }
                 } else {
+                    // Force hide mesh when PLAYING or GAME_OVER
                     placementGrid.visible = false;
                 }
             }
@@ -820,6 +830,7 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
+            // Treat floor as a bit lower (-0.15m)
             gameBoard.translateY(baseLift - 0.15); 
             gameBoard.translateZ(depthOffset);
             
@@ -886,8 +897,8 @@
             for (let i = gameBoard.children.length - 1; i >= 0; i--) {
                 gameBoard.remove(gameBoard.children[i]);
             }
-            scene.remove(gameBoard); // Remove the whole board from scene
-            gameBoard = new THREE.Group(); // Create fresh group
+            scene.remove(gameBoard); 
+            gameBoard = new THREE.Group(); 
 
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             score = 0;
@@ -928,6 +939,17 @@
                 }
 
                 playSound(lineClearSound);
+                const flash = document.createElement('div');
+                flash.style.position = 'absolute';
+                flash.style.top = '0';
+                flash.style.left = '0';
+                flash.style.width = '100%';
+                flash.style.height = '100%';
+                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                flash.style.zIndex = '999';
+                flash.style.pointerEvents = 'none'; 
+                document.body.appendChild(flash);
+                setTimeout(() => document.body.removeChild(flash), 100);
             }
             scoreBox.textContent = `Score: ${score}`;
         }
@@ -1094,6 +1116,7 @@
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
+            // playSound(moveSound); // Sound disabled on hard drop too
         }
 
         function isValidMove(piece, delta) {

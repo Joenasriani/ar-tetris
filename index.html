@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v38 - Smaller Fonts & Enforced Audio)</title>
+    <title>AR Tetris 3D (v39 - Intro & Polish)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -54,7 +54,7 @@
             border-radius: 15px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
-            font-size: 1.1rem; /* Reduced from 1.5rem */
+            font-size: 1.1rem; 
             font-weight: 500;
             z-index: 100;
             pointer-events: none; 
@@ -72,7 +72,7 @@
             top: 40%; 
             transform: translate(-50%, -50%);
             color: #FF4136;
-            font-size: 2.2rem; /* Reduced from 3rem */
+            font-size: 2.2rem; 
             font-weight: bold;
             display: none;
             text-shadow: 2px 2px 0px #000;
@@ -81,9 +81,9 @@
         #score-box {
             top: 20px;
             left: 20px;
-            transform: none; /* Left aligned */
+            transform: none; 
             color: #FFDC00;
-            font-size: 1.2rem; /* Reduced from 1.8rem */
+            font-size: 1.2rem; 
             font-weight: bold;
             text-shadow: 1px 1px 0px #000;
             display: none; 
@@ -95,7 +95,7 @@
             left: 20px;
             transform: none;
             color: #00FFFF; 
-            font-size: 1rem; /* Reduced from 1.2rem */
+            font-size: 1rem; 
             font-weight: bold;
             text-shadow: 1px 1px 0px #000;
             display: none; 
@@ -113,7 +113,7 @@
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1.2rem; /* Reduced */
+            font-size: 1.2rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
@@ -140,7 +140,7 @@
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1rem; /* Reduced */
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
@@ -168,7 +168,7 @@
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1rem; /* Reduced */
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
@@ -189,7 +189,7 @@
         #music-toggle {
             position: absolute;
             top: 20px;
-            right: 20px; /* Moved to top-right to balance score */
+            right: 20px; 
             width: 40px;
             height: 40px;
             background-color: rgba(0, 0, 0, 0.5);
@@ -213,6 +213,48 @@
             height: 20px;
             fill: white;
         }
+        
+        /* --- NEW: Intro Screen Styles --- */
+        #intro-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent black */
+            z-index: 200; /* On top of everything */
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        
+        #intro-title {
+            font-family: 'TetrisBlocks', sans-serif;
+            font-size: 3rem;
+            color: #FF00FF; /* Neon Magenta */
+            text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000;
+            margin-bottom: 10px;
+            text-align: center;
+            animation: pulse 1.5s infinite alternate;
+        }
+        
+        #intro-subtitle {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 300;
+            font-size: 1.2rem;
+            color: #00FFFF; /* Cyan */
+            text-shadow: 0 0 5px #00FFFF;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+        
+        @keyframes pulse {
+            from { transform: scale(1); text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000; }
+            to { transform: scale(1.05); text-shadow: 0 0 20px #FF00FF, 2px 2px 0 #000; }
+        }
 
     </style>
 </head>
@@ -223,6 +265,12 @@
     <div id="game-over-box" class="ui-element">GAME OVER</div>
     <div id="score-box" class="ui-element">Score: 0</div>
     <div id="level-box" class="ui-element">Level: 1</div>
+
+    <!-- NEW: Intro Screen -->
+    <div id="intro-screen">
+        <div id="intro-title">ROCKIN' TETRIS</div>
+        <div id="intro-subtitle">in AR</div>
+    </div>
 
     <!-- Music Toggle -->
     <button id="music-toggle" aria-label="Toggle Music">
@@ -249,10 +297,6 @@
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
     
-    <!-- 
-      CRITICAL: Filenames match exactly what you requested.
-      Ensure your folders are lowercase: /music/
-    -->
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
@@ -282,6 +326,9 @@
         
         let customArButton, messageBox, scoreBox, levelBox, gameOverBox, geminiTipButton, replayButton, musicToggleBtn;
         let iconSoundOn, iconSoundOff;
+        
+        // --- NEW: Intro Elements ---
+        let introScreen;
         
         const GAME_STATE = {
             INITIALIZING: 0,
@@ -355,6 +402,9 @@
             replayButton = document.getElementById('replay-button');
             ttsAudio = document.getElementById('audio-tts');
             
+            // --- Intro Elements ---
+            introScreen = document.getElementById('intro-screen');
+            
             musicToggleBtn = document.getElementById('music-toggle');
             iconSoundOn = document.getElementById('icon-sound-on');
             iconSoundOff = document.getElementById('icon-sound-off');
@@ -375,23 +425,17 @@
 
             // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
-                // This code runs on direct user interaction.
-                // It MUST play and (optionally) pause everything to unlock the context.
-                
                 console.log("Unlocking audio context...");
                 const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
                 
                 allSounds.forEach(s => {
                     if(s) {
-                        // Force play
                         const p = s.play();
                         if (p !== undefined) {
                             p.then(() => {
                                 if(s === bgmLoop) {
                                     console.log("BGM started successfully");
-                                    // Don't pause BGM
                                 } else {
-                                    // Immediately pause SFX so they are ready but silent
                                     s.pause();
                                     s.currentTime = 0;
                                 }
@@ -420,7 +464,6 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // Failsafe check for BGM
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
@@ -457,8 +500,8 @@
 
                 e.preventDefault(); 
                 if (gameState === GAME_STATE.PLACING) {
-                    updateMessage("Starting Game...", true);
-                    startGame();
+                    updateMessage(""); // Clear tap message
+                    playIntroAndStart(); // --- Start Intro Sequence ---
                     return; 
                 }
                 if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) return; 
@@ -626,23 +669,18 @@
             }
         }
 
-        function startGame() {
-            gameState = GAME_STATE.PLAYING;
-            scoreBox.style.display = 'block';
-            levelBox.style.display = 'block'; 
-            updateScore(0);
-            
+        // --- NEW: Intro Sequence Function ---
+        function playIntroAndStart() {
+            // 1. Lock the board position immediately
             const depthOffset = -0.5; 
             const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
 
             const targetPos = new THREE.Vector3();
             targetPos.setFromMatrixPosition(placementGrid.matrix);
-            
             gameBoard.position.copy(targetPos);
             
             const cameraPos = new THREE.Vector3();
             camera.getWorldPosition(cameraPos);
-            
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
             gameBoard.translateY(baseLift);
@@ -650,8 +688,34 @@
             
             scene.add(gameBoard);
             placementGrid.visible = false; 
-            spawnPiece();
             
+            // 2. Show Intro Screen
+            introScreen.style.display = 'flex';
+            
+            // Fade In
+            setTimeout(() => {
+                introScreen.style.opacity = '1';
+            }, 50); // Slight delay to ensure display:flex applies first
+
+            // 3. Wait, then Fade Out and Start Game
+            setTimeout(() => {
+                introScreen.style.opacity = '0';
+                
+                setTimeout(() => {
+                    introScreen.style.display = 'none';
+                    startGame();
+                }, 500); // Wait for fade out transition (0.5s)
+                
+            }, 2500); // Show intro for 2.5 seconds
+        }
+
+        function startGame() {
+            gameState = GAME_STATE.PLAYING;
+            scoreBox.style.display = 'block';
+            levelBox.style.display = 'block'; 
+            updateScore(0);
+            
+            spawnPiece();
             gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 

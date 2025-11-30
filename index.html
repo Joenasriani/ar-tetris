@@ -2,21 +2,15 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v43 - Final Polish & Audio)</title>
+    <title>AR Tetris 3D (v45 - Montserrat & Low Audio)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
-    <!-- Load Google Font: Montserrat (Medium weight) -->
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet">
+    <!-- Load Google Font: Montserrat (Medium & Bold) -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
-        /* --- Load Custom Font --- */
-        @font-face {
-            font-family: 'TetrisBlocks';
-            src: url('font/TetrisBlocks-P99g.ttf') format('truetype');
-        }
-
         /* Basic reset */
         body, html {
             width: 100%;
@@ -24,9 +18,9 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Use Montserrat Medium, fallback to sans-serif */
+            /* 1. Font changed to Montserrat */
             font-family: 'Montserrat', sans-serif; 
-            font-weight: 500; 
+            font-weight: 400; 
             background-color: #111;
             color: white;
             touch-action: none; 
@@ -45,22 +39,22 @@
             visibility: hidden !important;
         }
 
-        /* UI Elements - SCALED DOWN FONTS */
+        /* UI Elements */
         .ui-element {
             position: absolute;
             left: 50%;
             transform: translateX(-50%);
-            padding: 8px 16px; 
+            padding: 10px 20px;
             background-color: rgba(0, 0, 0, 0.6);
-            border-radius: 12px;
+            border-radius: 15px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
             font-size: 1rem; 
-            font-weight: 500;
+            font-weight: 600;
             z-index: 100;
             pointer-events: none; 
-            letter-spacing: 1px;
-            font-family: 'TetrisBlocks', sans-serif; 
+            letter-spacing: 0.5px;
+            font-family: 'Montserrat', sans-serif; 
         }
 
         #message-box {
@@ -73,11 +67,12 @@
             top: 40%; 
             transform: translate(-50%, -50%);
             color: #FF4136;
-            font-size: 1.8rem; 
-            font-weight: bold;
+            font-size: 2rem; 
+            font-weight: 600;
             display: none;
             text-shadow: 2px 2px 0px #000;
             padding: 20px 40px;
+            font-family: 'Montserrat', sans-serif;
         }
 
         #score-box {
@@ -85,23 +80,23 @@
             left: 20px;
             transform: none; 
             color: #FFDC00;
-            font-size: 1rem; 
-            font-weight: bold;
+            font-size: 1.2rem; 
+            font-weight: 600;
             text-shadow: 1px 1px 0px #000;
             display: none; 
+            font-family: 'Montserrat', sans-serif;
         }
         
-        /* Level Box */
         #level-box {
             top: 50px;
             left: 20px;
             transform: none;
             color: #00FFFF; 
-            font-size: 0.9rem; 
-            font-weight: bold;
+            font-size: 1rem; 
+            font-weight: 600;
             text-shadow: 1px 1px 0px #000;
             display: none; 
-            font-family: 'TetrisBlocks', sans-serif;
+            font-family: 'Montserrat', sans-serif;
         }
 
         /* Custom AR Button */
@@ -110,12 +105,12 @@
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 24px; 
+            padding: 14px 28px;
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
-            font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
@@ -141,8 +136,8 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
-            font-family: 'TetrisBlocks', sans-serif;
-            font-size: 0.9rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
@@ -169,8 +164,8 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
-            font-family: 'TetrisBlocks', sans-serif;
-            font-size: 0.9rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
@@ -192,8 +187,8 @@
             position: absolute;
             top: 20px;
             right: 20px; 
-            width: 36px; 
-            height: 36px;
+            width: 40px; 
+            height: 40px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 50%;
             border: 2px solid rgba(255, 255, 255, 0.3);
@@ -211,8 +206,8 @@
         }
 
         #music-toggle svg {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             fill: white;
         }
         
@@ -234,7 +229,8 @@
         }
         
         #intro-title {
-            font-family: 'TetrisBlocks', sans-serif;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800; /* Extra bold for title */
             font-size: 2.5rem; 
             color: #FF00FF; 
             text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000;
@@ -245,7 +241,7 @@
         
         #intro-subtitle {
             font-family: 'Montserrat', sans-serif;
-            font-weight: 300;
+            font-weight: 400;
             font-size: 1rem; 
             color: #00FFFF; 
             text-shadow: 0 0 5px #00FFFF;
@@ -298,7 +294,6 @@
     
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
-    
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
@@ -372,6 +367,7 @@
         let blueGridMat, greenGridMat;
 
         function triggerHaptic(duration = 20) {
+            // 3. Haptics are on
             if (navigator.vibrate) navigator.vibrate(duration);
         }
         
@@ -426,7 +422,7 @@
             // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
                 console.log("Unlocking audio context...");
-                triggerHaptic(5); // Short haptic on launch
+                triggerHaptic(5); 
                 const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
                 
                 allSounds.forEach(s => {
@@ -452,30 +448,29 @@
             geminiTipButton.addEventListener('click', () => {
                 geminiTipButton.disabled = true;
                 geminiTipButton.textContent = "Thinking...";
-                triggerHaptic(5); // Short haptic on tip click
+                triggerHaptic(5); 
                 getGeminiTip();
             });
 
             replayButton.addEventListener('click', () => {
-                triggerHaptic(5); // Short haptic on replay click
+                triggerHaptic(5); 
                 resetGame();
             });
 
             musicToggleBtn.addEventListener('click', () => {
-                triggerHaptic(5); // Short haptic on music toggle
+                triggerHaptic(5); 
                 toggleMusic();
             });
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // --- LOWERED VOLUME ---
-                    if (bgmLoop) bgmLoop.volume = 0.4; // Lowered to 40%
+                    // 4. Music and sfx are very low in volume
+                    if (bgmLoop) bgmLoop.volume = 0.08; // Lowered further
                     
-                    // --- LOWERED SFX VOLUME ---
-                    if (moveSound) moveSound.volume = 0.4; // Lowered to 40%
-                    if (rotateSound) rotateSound.volume = 0.4; // Lowered to 40%
-                    if (gameOverSound) gameOverSound.volume = 0.4; // Lowered to 40%
-                    if (lineClearSound) lineClearSound.volume = 0.4; // Lowered to 40%
+                    if (moveSound) moveSound.volume = 0.1; // Very Low
+                    if (rotateSound) rotateSound.volume = 0.1; // Very Low
+                    if (gameOverSound) gameOverSound.volume = 0.1; // Very Low
+                    if (lineClearSound) lineClearSound.volume = 0.1; // Very Low
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -664,7 +659,6 @@
                         }
                     }
                 } else {
-                    // --- FIX: Force hide mesh when PLAYING or GAME_OVER ---
                     placementGrid.visible = false;
                 }
             }
@@ -697,8 +691,8 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
-            // --- NEW: Treat floor as a bit lower than detected ---
-            gameBoard.translateY(baseLift - 0.05); // Lower by 5cm
+            // 2. Always treat the floor in the game a bit lower than where it is
+            gameBoard.translateY(baseLift - 0.15); // Lowered by 15cm
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
@@ -727,7 +721,6 @@
             levelBox.style.display = 'block'; 
             updateScore(0);
             
-            // Ensure green mesh is hidden
             placementGrid.visible = false;
 
             spawnPiece();
@@ -825,8 +818,7 @@
             if (isValidMove(currentPiece, { x: direction })) {
                 currentPiece.userData.gridPos.x += direction;
                 updatePiecePosition(currentPiece);
-                triggerHaptic(5); // Short haptic on move
-                playSound(moveSound);
+                triggerHaptic(5); 
             }
         }
         
@@ -902,7 +894,7 @@
                         }
                     }
                     updatePiecePosition(currentPiece);
-                    triggerHaptic(5); // Short haptic on rotate
+                    triggerHaptic(5); 
                     playSound(rotateSound);
                     return; 
                 }
@@ -919,8 +911,8 @@
             spawnPiece();
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
-            triggerHaptic(20); // Slightly longer haptic for hard drop
-            playSound(moveSound); 
+            triggerHaptic(20); 
+            // playSound(moveSound); 
         }
 
         function isValidMove(piece, delta) {

@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v32 - Modern Thin Font)</title>
+    <title>AR Tetris 3D (v34 - Speed Increase)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -11,6 +11,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500&display=swap" rel="stylesheet">
 
     <style>
+        /* --- NEW: Load Custom Font --- */
+        @font-face {
+            font-family: 'TetrisBlocks';
+            src: url('font/TetrisBlocks-P99g.ttf') format('truetype');
+        }
+
         /* Basic reset */
         body, html {
             width: 100%;
@@ -18,9 +24,8 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Use Roboto Thin/Light */
-            font-family: 'Roboto', sans-serif; 
-            font-weight: 300; /* Light weight */
+            /* Apply custom font globally, fallback to sans-serif */
+            font-family: 'TetrisBlocks', 'Segoe UI', sans-serif; 
             background-color: #111;
             color: white;
             touch-action: none; 
@@ -49,11 +54,11 @@
             border-radius: 20px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
-            font-size: 1.2rem;
-            font-weight: 300; /* Light/Thin */
+            font-size: 1.5rem; 
+            font-weight: 500;
             z-index: 100;
             pointer-events: none; 
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
         }
 
         #message-box {
@@ -63,14 +68,13 @@
         }
         
         #game-over-box {
-            top: 50%;
+            top: 40%; 
             transform: translate(-50%, -50%);
             color: #FF4136;
             font-size: 3rem; 
-            font-weight: 100; /* Very Thin */
+            font-weight: bold;
             display: none;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            text-shadow: 2px 2px 0px #000;
         }
 
         #score-box {
@@ -78,8 +82,21 @@
             left: 30px;
             transform: none;
             color: #FFDC00;
-            font-size: 1.5rem;
-            font-weight: 300;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 0px #000;
+        }
+        
+        /* NEW: Level Box */
+        #level-box {
+            top: 70px;
+            left: 30px;
+            transform: none;
+            color: #00FFFF; /* Cyan */
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 0px #000;
+            display: none; /* Hidden until game starts */
         }
 
         /* Custom AR Button */
@@ -88,13 +105,13 @@
             bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 16px 32px;
+            padding: 18px 30px;
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
-            font-family: 'Roboto', sans-serif;
-            font-size: 1.2rem;
-            font-weight: 300; /* Thin */
+            font-family: 'TetrisBlocks', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
             cursor: pointer;
@@ -102,7 +119,6 @@
             transition: all 0.3s ease;
             pointer-events: auto; 
             text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         #custom-ar-button:hover {
@@ -113,16 +129,16 @@
         /* Gemini Tip Button */
         #gemini-tip-button {
             position: absolute;
-            top: calc(50% + 80px); 
+            top: calc(50% + 20px); 
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 24px;
+            padding: 12px 20px;
             border-radius: 20px;
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
-            font-family: 'Roboto', sans-serif;
-            font-size: 1rem;
-            font-weight: 300;
+            font-family: 'TetrisBlocks', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
             cursor: pointer;
@@ -130,14 +146,40 @@
             transition: all 0.3s ease;
             pointer-events: auto;
             display: none;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
         
         #gemini-tip-button:disabled {
             background: #555;
             opacity: 0.7;
             cursor: not-allowed;
+        }
+
+        /* Replay Button */
+        #replay-button {
+            position: absolute;
+            top: calc(50% + 90px); 
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 30px;
+            border-radius: 20px;
+            background: linear-gradient(145deg, #2ecc71, #27ae60); 
+            color: white;
+            font-family: 'TetrisBlocks', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border: none;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
+            cursor: pointer;
+            z-index: 101;
+            transition: all 0.3s ease;
+            pointer-events: auto;
+            display: none;
+            text-transform: uppercase;
+        }
+
+        #replay-button:hover {
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.7);
         }
 
     </style>
@@ -148,6 +190,7 @@
     <div id="message-box" class="ui-element">Scan floor to start</div>
     <div id="game-over-box" class="ui-element">GAME OVER</div>
     <div id="score-box" class="ui-element" style="display: none;">Score: 0</div>
+    <div id="level-box" class="ui-element">Level: 1</div>
 
     <button id="custom-ar-button">
         Launch AR
@@ -155,6 +198,10 @@
     
     <button id="gemini-tip-button">
         Get Tip
+    </button>
+
+    <button id="replay-button">
+        Play Again
     </button>
     
     <!-- Audio -->
@@ -186,7 +233,7 @@
         let currentPiece = null;
         let gameLoopInterval = null;
         
-        let customArButton, messageBox, scoreBox, gameOverBox, geminiTipButton;
+        let customArButton, messageBox, scoreBox, levelBox, gameOverBox, geminiTipButton, replayButton;
         
         const GAME_STATE = {
             INITIALIZING: 0,
@@ -197,6 +244,12 @@
         };
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
+        
+        // --- New Level Variables ---
+        let level = 1;
+        let linesClearedTotal = 0;
+        let currentDropSpeed = 1000; // Start at 1 second per drop
+        const MIN_DROP_SPEED = 100; // Fastest speed (0.1s per drop)
 
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20; 
@@ -247,8 +300,10 @@
             customArButton = document.getElementById('custom-ar-button');
             messageBox = document.getElementById('message-box');
             scoreBox = document.getElementById('score-box');
+            levelBox = document.getElementById('level-box');
             gameOverBox = document.getElementById('game-over-box');
             geminiTipButton = document.getElementById('gemini-tip-button');
+            replayButton = document.getElementById('replay-button');
             ttsAudio = document.getElementById('audio-tts');
 
             const arButton = ARButton.createButton(renderer, {
@@ -271,6 +326,10 @@
                 geminiTipButton.disabled = true;
                 geminiTipButton.textContent = "Processing...";
                 getGeminiTip();
+            });
+
+            replayButton.addEventListener('click', () => {
+                resetGame();
             });
 
             renderer.xr.addEventListener('sessionstart', () => {
@@ -308,6 +367,8 @@
             const STRAFE_INTERVAL_MS = 130; 
 
             function onTouchStart(e) {
+                if (e.target.tagName === 'BUTTON') return;
+
                 e.preventDefault(); 
                 if (gameState === GAME_STATE.PLACING) {
                     updateMessage("Starting Game...", true);
@@ -334,6 +395,7 @@
             }
             
             function onTouchMove(e) {
+                if (e.target.tagName === 'BUTTON') return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) return;
                 
@@ -350,6 +412,7 @@
             }
             
             function onTouchEnd(e) {
+                if (e.target.tagName === 'BUTTON') return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING) return;
                 if (strafeInterval) clearInterval(strafeInterval);
@@ -449,12 +512,10 @@
                             const referenceSpace = renderer.xr.getReferenceSpace();
                             const pose = hit.getPose(referenceSpace);
                             
-                            // Apply full transform to the mesh
                             placementGrid.matrix.fromArray(pose.transform.matrix);
                             placementGrid.matrixAutoUpdate = false; 
                             placementGrid.visible = true; 
 
-                            // Check floor normal
                             const normalY = pose.transform.matrix[5]; 
                             const isFloor = normalY > 0.85;
 
@@ -502,6 +563,7 @@
         function startGame() {
             gameState = GAME_STATE.PLAYING;
             scoreBox.style.display = 'block';
+            levelBox.style.display = 'block'; // Show level
             updateScore(0);
             
             const depthOffset = -0.5; 
@@ -523,7 +585,9 @@
             scene.add(gameBoard);
             placementGrid.visible = false; 
             spawnPiece();
-            gameLoopInterval = setInterval(gameTick, 1000);
+            
+            // Use currentDropSpeed
+            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
         function gameTick() {
@@ -542,14 +606,63 @@
             gameState = GAME_STATE.GAME_OVER;
             gameOverBox.style.display = 'block';
             geminiTipButton.style.display = 'block';
+            replayButton.style.display = 'block'; 
+            
             if (bgmLoop) bgmLoop.pause();
             playSound(gameOverSound);
         }
 
+        function resetGame() {
+            gameOverBox.style.display = 'none';
+            geminiTipButton.style.display = 'none';
+            replayButton.style.display = 'none';
+            geminiTipButton.disabled = false;
+            geminiTipButton.textContent = "Get Tip";
+
+            for (let i = gameBoard.children.length - 1; i >= 0; i--) {
+                const child = gameBoard.children[i];
+                gameBoard.remove(child);
+            }
+            grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+            score = 0;
+            
+            // Reset Speed
+            linesClearedTotal = 0;
+            level = 1;
+            currentDropSpeed = 1000;
+            updateScore(0); 
+            levelBox.textContent = `Level: ${level}`;
+
+            if (bgmLoop) {
+                bgmLoop.currentTime = 0;
+                bgmLoop.play().catch(e => console.error("BGM restart failed:", e));
+            }
+
+            gameState = GAME_STATE.PLAYING;
+            spawnPiece();
+            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+        }
+
         function updateScore(linesCleared) {
-            const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
             if (linesCleared > 0) {
+                const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
                 score += points[linesCleared] || 0;
+                
+                // --- NEW: Increase Speed ---
+                linesClearedTotal += linesCleared;
+                const newLevel = Math.floor(linesClearedTotal / 5) + 1; // Level up every 5 lines
+                
+                if (newLevel > level) {
+                    level = newLevel;
+                    levelBox.textContent = `Level: ${level}`;
+                    // Increase speed (decrease interval) by 10% per level
+                    currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
+                    
+                    // Clear old interval and start new one with faster speed
+                    clearInterval(gameLoopInterval);
+                    gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                }
+
                 playSound(lineClearSound);
                 const flash = document.createElement('div');
                 flash.style.position = 'absolute';
@@ -664,7 +777,7 @@
             lockPiece();
             spawnPiece();
             clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameTick, 1000);
+            gameLoopInterval = setInterval(gameTick, currentDropSpeed); // use current speed
             triggerHaptic(50);
             playSound(moveSound); 
         }

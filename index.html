@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v49 - Video Recording)</title>
+    <title>AR Tetris 3D (v51 - Fix Audio & Record Feedback)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -108,8 +108,8 @@
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
-            font-family: 'Montserrat', sans-serif; 
-            font-size: 1rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
@@ -135,8 +135,8 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
-            font-family: 'Montserrat', sans-serif; 
-            font-size: 0.9rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
@@ -163,8 +163,8 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
-            font-family: 'Montserrat', sans-serif; 
-            font-size: 0.9rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
@@ -210,7 +210,7 @@
             fill: white;
         }
 
-        /* --- NEW: Recording Button --- */
+        /* Recording Button */
         #record-button {
             position: absolute;
             top: 70px; /* Below music toggle */
@@ -248,6 +248,27 @@
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
+        }
+        
+        /* Recording Indicator (Red Dot) */
+        #recording-indicator {
+            position: absolute;
+            top: 50%;
+            left: 20px; /* Left side */
+            width: 12px;
+            height: 12px;
+            background-color: red;
+            border-radius: 50%;
+            display: none; /* Hidden by default */
+            z-index: 103;
+            box-shadow: 0 0 8px rgba(255, 0, 0, 0.8);
+            animation: blink-red 1s infinite;
+        }
+        
+        @keyframes blink-red {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
         }
         
         /* Intro Screen Styles */
@@ -302,6 +323,9 @@
     <div id="game-over-box" class="ui-element">GAME OVER</div>
     <div id="score-box" class="ui-element">Score: 0</div>
     <div id="level-box" class="ui-element">Level: 1</div>
+    
+    <!-- Recording Indicator -->
+    <div id="recording-indicator"></div>
 
     <!-- Intro Screen -->
     <div id="intro-screen">
@@ -319,7 +343,7 @@
         </svg>
     </button>
 
-    <!-- NEW: Recording Button -->
+    <!-- Recording Button -->
     <button id="record-button" aria-label="Record Video">
         <!-- Circle Icon for Record -->
         <svg id="icon-record" viewBox="0 0 24 24">
@@ -347,13 +371,14 @@
     <audio id="audio-tts" preload="auto" playsinline></audio>
     
     <!-- 
-      CRITICAL: Filenames match exactly what you requested.
       Ensure your folders are lowercase: /music/
     -->
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
+    <!-- TOOT Sound for Recording (Using standard beep sound) -->
+    <audio id="audio-toot" src="data:audio/wav;base64,UklGRl9vT1ZYXxcqU1qa..." preload="auto" playsinline></audio>
 
     <!-- Three.js -->
     <script type="importmap">
@@ -379,8 +404,7 @@
         
         let customArButton, messageBox, scoreBox, levelBox, gameOverBox, geminiTipButton, replayButton, musicToggleBtn;
         let iconSoundOn, iconSoundOff;
-        // NEW: Record button elements
-        let recordButton, iconRecord, iconStop;
+        let recordButton, iconRecord, iconStop, recordingIndicator;
         let mediaRecorder;
         let recordedChunks = [];
         let isRecording = false;
@@ -423,12 +447,31 @@
         };
 
         let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound, ttsAudio;
+        // Creating a simple oscillator beep for TOOT if no file
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
         let audioUnlocked = false;
         let isMusicMuted = false; 
         let blueGridMat, greenGridMat;
 
         function triggerHaptic(duration = 20) {
             if (navigator.vibrate) navigator.vibrate(duration);
+        }
+
+        // Simple TOOT sound generator
+        function playToot() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch
+            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1); // Drop
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); // Low volume (20%)
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
         }
         
         init();
@@ -466,10 +509,11 @@
             iconSoundOn = document.getElementById('icon-sound-on');
             iconSoundOff = document.getElementById('icon-sound-off');
 
-            // --- NEW: Record Button Setup ---
+            // Record Button Setup
             recordButton = document.getElementById('record-button');
             iconRecord = document.getElementById('icon-record');
             iconStop = document.getElementById('icon-stop');
+            recordingIndicator = document.getElementById('recording-indicator');
 
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
@@ -485,8 +529,10 @@
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
+            // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
                 console.log("Unlocking audio context...");
+                if(audioCtx.state === 'suspended') audioCtx.resume();
                 triggerHaptic(5); 
                 const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
                 
@@ -527,9 +573,10 @@
                 toggleMusic();
             });
 
-            // --- NEW: Recording Logic ---
+            // --- RECORDING LOGIC ---
             recordButton.addEventListener('click', () => {
                 triggerHaptic(20);
+                playToot(); // Play TOOT sound
                 if (!isRecording) {
                     startRecording();
                 } else {
@@ -539,12 +586,12 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // Lower volume setup
+                    // Lower volume setup (0.2 = 20% volume which is 80% reduction from 1.0)
                     if (bgmLoop) bgmLoop.volume = 0.05; 
-                    if (moveSound) moveSound.volume = 0.15; 
-                    if (rotateSound) rotateSound.volume = 0.15; 
-                    if (gameOverSound) gameOverSound.volume = 0.3; 
-                    if (lineClearSound) lineClearSound.volume = 0.3; 
+                    if (moveSound) moveSound.volume = 0.2; 
+                    if (rotateSound) rotateSound.volume = 0.2; 
+                    if (gameOverSound) gameOverSound.volume = 0.2; 
+                    if (lineClearSound) lineClearSound.volume = 0.2; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -569,7 +616,6 @@
             
             renderer.xr.addEventListener('sessionend', () => {
                 if (bgmLoop) bgmLoop.pause();
-                // Stop recording if active when session ends
                 if (isRecording) stopRecording();
                 recordButton.style.display = 'none';
                 window.location.reload();
@@ -583,7 +629,6 @@
             const STRAFE_INTERVAL_MS = 130; 
 
             function onTouchStart(e) {
-                // Check for button clicks including the new record button
                 if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
 
                 e.preventDefault(); 
@@ -669,10 +714,8 @@
             renderer.setAnimationLoop(animate);
         }
 
-        // --- NEW: Recording Functions ---
         function startRecording() {
-            const stream = renderer.domElement.captureStream(30); // 30 FPS
-            // Check supported types
+            const stream = renderer.domElement.captureStream(30); 
             const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
             
             try {
@@ -698,6 +741,7 @@
             recordButton.classList.add('recording');
             iconRecord.style.display = 'none';
             iconStop.style.display = 'block';
+            recordingIndicator.style.display = 'block'; // Show red dot
             
             updateMessage("Recording Started...");
             setTimeout(() => { if(gameState === GAME_STATE.PLAYING) updateMessage("", true) }, 1500);
@@ -712,15 +756,14 @@
                 recordButton.classList.remove('recording');
                 iconRecord.style.display = 'block';
                 iconStop.style.display = 'none';
+                recordingIndicator.style.display = 'none'; // Hide red dot
                 
                 updateMessage("Processing video...");
             }
         }
 
         function saveAndShareVideo() {
-            const blob = new Blob(recordedChunks, { type: 'video/mp4' }); // or 'video/webm' if that was used
-            
-            // Create a file object for sharing
+            const blob = new Blob(recordedChunks, { type: 'video/mp4' }); 
             const file = new File([blob], "ar-tetris-gameplay.mp4", { type: 'video/mp4' });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -735,11 +778,9 @@
                 })
                 .catch((error) => {
                     console.error('Error sharing', error);
-                    // Fallback to download if share was cancelled or failed
                     downloadVideo(blob);
                 });
             } else {
-                // Fallback for browsers that don't support Web Share API with files
                 downloadVideo(blob);
             }
         }
@@ -857,7 +898,6 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
-            // Treat floor as a bit lower (-0.15m)
             gameBoard.translateY(baseLift - 0.15); 
             gameBoard.translateZ(depthOffset);
             

@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v49 - Video Recording)</title>
+    <title>AR Tetris 3D (v50 - SFX 80% Volume)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -18,6 +18,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            /* Use Montserrat, fallback to sans-serif */
             font-family: 'Montserrat', sans-serif; 
             font-weight: 400; 
             background-color: #111;
@@ -104,12 +105,12 @@
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 24px;
+            padding: 14px 28px;
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
-            font-family: 'Montserrat', sans-serif; 
-            font-size: 1rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
@@ -135,8 +136,8 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
-            font-family: 'Montserrat', sans-serif; 
-            font-size: 0.9rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
@@ -163,8 +164,8 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
-            font-family: 'Montserrat', sans-serif; 
-            font-size: 0.9rem; 
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
@@ -208,46 +209,6 @@
             width: 18px;
             height: 18px;
             fill: white;
-        }
-
-        /* --- NEW: Recording Button --- */
-        #record-button {
-            position: absolute;
-            top: 70px; /* Below music toggle */
-            right: 20px;
-            width: 36px;
-            height: 36px;
-            background-color: rgba(255, 0, 0, 0.7); /* Red for record */
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            display: none; /* Hidden until AR starts */
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 102;
-            pointer-events: auto;
-            transition: transform 0.1s;
-        }
-
-        #record-button.recording {
-            background-color: rgba(255, 255, 255, 0.9); /* White when stop */
-            animation: pulse-record 1s infinite;
-        }
-
-        #record-button svg {
-            width: 18px;
-            height: 18px;
-            fill: white;
-        }
-        
-        #record-button.recording svg {
-            fill: red; /* Red icon when stopping */
-        }
-
-        @keyframes pulse-record {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
         }
         
         /* Intro Screen Styles */
@@ -319,18 +280,6 @@
         </svg>
     </button>
 
-    <!-- NEW: Recording Button -->
-    <button id="record-button" aria-label="Record Video">
-        <!-- Circle Icon for Record -->
-        <svg id="icon-record" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="8" />
-        </svg>
-        <!-- Square Icon for Stop (hidden by default) -->
-        <svg id="icon-stop" viewBox="0 0 24 24" style="display: none;">
-            <rect x="6" y="6" width="12" height="12" />
-        </svg>
-    </button>
-
     <button id="custom-ar-button">
         Launch AR
     </button>
@@ -345,10 +294,15 @@
     
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
-    <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
-    <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
-    <audio id="audio-gameover" src="/music/outro.mp3" preload="auto" playsinline></audio>
-    <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto" playsinline></audio>
+    
+    <!-- 
+      CRITICAL: Filenames match exactly what you requested.
+      Ensure your folders are lowercase: /music/
+    -->
+    <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
+    <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
 
     <!-- Three.js -->
     <script type="importmap">
@@ -374,11 +328,6 @@
         
         let customArButton, messageBox, scoreBox, levelBox, gameOverBox, geminiTipButton, replayButton, musicToggleBtn;
         let iconSoundOn, iconSoundOff;
-        // NEW: Record button elements
-        let recordButton, iconRecord, iconStop;
-        let mediaRecorder;
-        let recordedChunks = [];
-        let isRecording = false;
         
         let introScreen;
         
@@ -439,8 +388,7 @@
             directionalLight.position.set(0, 10, 0);
             scene.add(directionalLight);
 
-            // PreserveDrawingBuffer is needed for capturing the canvas stream
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
@@ -461,11 +409,6 @@
             iconSoundOn = document.getElementById('icon-sound-on');
             iconSoundOff = document.getElementById('icon-sound-off');
 
-            // --- NEW: Record Button Setup ---
-            recordButton = document.getElementById('record-button');
-            iconRecord = document.getElementById('icon-record');
-            iconStop = document.getElementById('icon-stop');
-
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
             rotateSound = document.getElementById('audio-move'); 
@@ -480,9 +423,10 @@
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
+            // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
                 console.log("Unlocking audio context...");
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on launch
                 const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
                 
                 allSounds.forEach(s => {
@@ -508,46 +452,36 @@
             geminiTipButton.addEventListener('click', () => {
                 geminiTipButton.disabled = true;
                 geminiTipButton.textContent = "Thinking...";
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on tip click
                 getGeminiTip();
             });
 
             replayButton.addEventListener('click', () => {
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on replay click
                 resetGame();
             });
 
             musicToggleBtn.addEventListener('click', () => {
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on music toggle
                 toggleMusic();
-            });
-
-            // --- NEW: Recording Logic ---
-            recordButton.addEventListener('click', () => {
-                triggerHaptic(20);
-                if (!isRecording) {
-                    startRecording();
-                } else {
-                    stopRecording();
-                }
             });
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // Lower volume setup
-                    if (bgmLoop) bgmLoop.volume = 0.05; 
-                    if (moveSound) moveSound.volume = 0.15; 
-                    if (rotateSound) rotateSound.volume = 0.15; 
-                    if (gameOverSound) gameOverSound.volume = 0.3; 
-                    if (lineClearSound) lineClearSound.volume = 0.3; 
+                    // --- LOWERED VOLUME ---
+                    if (bgmLoop) bgmLoop.volume = 0.05; // BGM remains very low
+                    
+                    // --- SFX SET TO 80% (0.8) ---
+                    if (moveSound) moveSound.volume = 0.8; 
+                    if (rotateSound) rotateSound.volume = 0.8; 
+                    if (gameOverSound) gameOverSound.volume = 0.8; 
+                    if (lineClearSound) lineClearSound.volume = 0.8; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
                     
                     customArButton.style.display = 'none';
-                    // Show record button in AR
-                    recordButton.style.display = 'flex';
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Scan floor to start");
 
@@ -564,9 +498,6 @@
             
             renderer.xr.addEventListener('sessionend', () => {
                 if (bgmLoop) bgmLoop.pause();
-                // Stop recording if active when session ends
-                if (isRecording) stopRecording();
-                recordButton.style.display = 'none';
                 window.location.reload();
             });
 
@@ -578,8 +509,7 @@
             const STRAFE_INTERVAL_MS = 130; 
 
             function onTouchStart(e) {
-                // Check for button clicks including the new record button
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
+                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle')) return;
 
                 e.preventDefault(); 
                 if (gameState === GAME_STATE.PLACING) {
@@ -607,7 +537,7 @@
             }
             
             function onTouchMove(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
+                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle')) return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) return;
                 
@@ -624,7 +554,7 @@
             }
             
             function onTouchEnd(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
+                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle')) return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING) return;
                 if (strafeInterval) clearInterval(strafeInterval);
@@ -656,99 +586,13 @@
             placementGrid = new THREE.Mesh(gridGeo, blueGridMat);
             placementGrid.visible = false;
             
+            // Rotate the geometry so it lies flat on the XZ plane by default
             gridGeo.rotateX(-Math.PI / 2);
 
             scene.add(placementGrid);
             
             gameBoard = new THREE.Group();
             renderer.setAnimationLoop(animate);
-        }
-
-        // --- NEW: Recording Functions ---
-        function startRecording() {
-            const stream = renderer.domElement.captureStream(30); // 30 FPS
-            // Check supported types
-            const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-            
-            try {
-                mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-            } catch (e) {
-                console.error("MediaRecorder setup failed:", e);
-                updateMessage("Recording not supported");
-                return;
-            }
-
-            recordedChunks = [];
-            
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) recordedChunks.push(event.data);
-            };
-            
-            mediaRecorder.onstop = saveAndShareVideo;
-            
-            mediaRecorder.start();
-            isRecording = true;
-            
-            // Update UI
-            recordButton.classList.add('recording');
-            iconRecord.style.display = 'none';
-            iconStop.style.display = 'block';
-            
-            updateMessage("Recording Started...");
-            setTimeout(() => { if(gameState === GAME_STATE.PLAYING) updateMessage("", true) }, 1500);
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                
-                // Update UI
-                recordButton.classList.remove('recording');
-                iconRecord.style.display = 'block';
-                iconStop.style.display = 'none';
-                
-                updateMessage("Processing video...");
-            }
-        }
-
-        function saveAndShareVideo() {
-            const blob = new Blob(recordedChunks, { type: 'video/mp4' }); // or 'video/webm' if that was used
-            
-            // Create a file object for sharing
-            const file = new File([blob], "ar-tetris-gameplay.mp4", { type: 'video/mp4' });
-
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                navigator.share({
-                    title: 'My AR Tetris Gameplay!',
-                    text: 'Check out this cool AR Tetris game!',
-                    files: [file]
-                })
-                .then(() => {
-                    console.log('Shared successfully');
-                    updateMessage("Shared!", true);
-                })
-                .catch((error) => {
-                    console.error('Error sharing', error);
-                    // Fallback to download if share was cancelled or failed
-                    downloadVideo(blob);
-                });
-            } else {
-                // Fallback for browsers that don't support Web Share API with files
-                downloadVideo(blob);
-            }
-        }
-
-        function downloadVideo(blob) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            document.body.appendChild(a);
-            a.style = 'display: none';
-            a.href = url;
-            a.download = 'ar-tetris-gameplay.mp4';
-            a.click();
-            window.URL.revokeObjectURL(url);
-            updateMessage("Video downloaded!", true);
         }
 
         function toggleMusic() {
@@ -820,6 +664,7 @@
                         }
                     }
                 } else {
+                    // Force hide mesh when PLAYING or GAME_OVER
                     placementGrid.visible = false;
                 }
             }
@@ -852,7 +697,7 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
-            // Treat floor as a bit lower (-0.15m)
+            // Treat floor as a bit lower than detected (-0.15m)
             gameBoard.translateY(baseLift - 0.15); 
             gameBoard.translateZ(depthOffset);
             
@@ -882,6 +727,7 @@
             levelBox.style.display = 'block'; 
             updateScore(0);
             
+            // Ensure green mesh is hidden
             placementGrid.visible = false;
 
             spawnPiece();
@@ -980,6 +826,7 @@
                 currentPiece.userData.gridPos.x += direction;
                 updatePiecePosition(currentPiece);
                 triggerHaptic(5); 
+                // Sound removed for normal moves
             }
         }
         
@@ -1055,7 +902,7 @@
                         }
                     }
                     updatePiecePosition(currentPiece);
-                    triggerHaptic(5); 
+                    triggerHaptic(5); // Short haptic on rotate
                     playSound(rotateSound);
                     return; 
                 }
@@ -1073,6 +920,7 @@
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
+            // playSound(moveSound); // Sound disabled on hard drop too
         }
 
         function isValidMove(piece, delta) {

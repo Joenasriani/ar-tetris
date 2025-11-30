@@ -2,13 +2,13 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v37 - Montserrat Medium Font)</title>
+    <title>AR Tetris 3D (v38 - Smaller Fonts & Enforced Audio)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
-    <!-- Load Google Font: Montserrat (Medium weight) -->
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet">
+    <!-- Load Google Font: Roboto (Thin weight) -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500&display=swap" rel="stylesheet">
 
     <style>
         /* --- Load Custom Font --- */
@@ -24,9 +24,8 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Use Montserrat Medium, fallback to sans-serif */
-            font-family: 'Montserrat', sans-serif; 
-            font-weight: 500; /* Medium weight */
+            font-family: 'Roboto', sans-serif; 
+            font-weight: 300; 
             background-color: #111;
             color: white;
             touch-action: none; 
@@ -45,27 +44,26 @@
             visibility: hidden !important;
         }
 
-        /* UI Elements */
+        /* UI Elements - SCALED DOWN FONTS */
         .ui-element {
             position: absolute;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 24px;
+            padding: 10px 20px;
             background-color: rgba(0, 0, 0, 0.6);
-            border-radius: 20px;
+            border-radius: 15px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
-            font-size: 1.5rem; 
+            font-size: 1.1rem; /* Reduced from 1.5rem */
             font-weight: 500;
             z-index: 100;
             pointer-events: none; 
             letter-spacing: 1px;
-            /* Ensure font is Montserrat Medium */
-            font-family: 'Montserrat', sans-serif; 
+            font-family: 'TetrisBlocks', sans-serif; 
         }
 
         #message-box {
-            top: 30px;
+            top: 20px;
             display: none;
             max-width: 90%;
         }
@@ -74,48 +72,49 @@
             top: 40%; 
             transform: translate(-50%, -50%);
             color: #FF4136;
-            font-size: 3rem; 
-            font-weight: 500; /* Medium weight */
+            font-size: 2.2rem; /* Reduced from 3rem */
+            font-weight: bold;
             display: none;
             text-shadow: 2px 2px 0px #000;
         }
 
         #score-box {
-            top: 30px;
-            left: 50%; /* Center horizontally */
-            transform: translateX(-50%); /* Center align */
+            top: 20px;
+            left: 20px;
+            transform: none; /* Left aligned */
             color: #FFDC00;
-            font-size: 1.8rem;
-            font-weight: 500; /* Medium weight */
-            text-shadow: 2px 2px 0px #000;
-            display: none; /* Hidden initially */
-        }
-        
-        #level-box {
-            top: 70px;
-            left: 50%; /* Center horizontally */
-            transform: translateX(-50%); /* Center align */
-            color: #00FFFF; 
-            font-size: 1.2rem;
-            font-weight: 500; /* Medium weight */
+            font-size: 1.2rem; /* Reduced from 1.8rem */
+            font-weight: bold;
             text-shadow: 1px 1px 0px #000;
             display: none; 
-            font-family: 'Montserrat', sans-serif;
+        }
+        
+        /* Level Box */
+        #level-box {
+            top: 50px;
+            left: 20px;
+            transform: none;
+            color: #00FFFF; 
+            font-size: 1rem; /* Reduced from 1.2rem */
+            font-weight: bold;
+            text-shadow: 1px 1px 0px #000;
+            display: none; 
+            font-family: 'TetrisBlocks', sans-serif;
         }
 
         /* Custom AR Button */
         #custom-ar-button {
             position: absolute;
-            bottom: 40px;
+            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 18px 30px;
+            padding: 14px 28px;
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 500; /* Medium weight */
+            font-family: 'TetrisBlocks', sans-serif;
+            font-size: 1.2rem; /* Reduced */
+            font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
             cursor: pointer;
@@ -136,13 +135,13 @@
             top: calc(50% + 20px); 
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 20px;
+            padding: 10px 20px;
             border-radius: 20px;
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.2rem;
-            font-weight: 500; /* Medium weight */
+            font-family: 'TetrisBlocks', sans-serif;
+            font-size: 1rem; /* Reduced */
+            font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
             cursor: pointer;
@@ -161,16 +160,16 @@
         /* Replay Button */
         #replay-button {
             position: absolute;
-            top: calc(50% + 90px); 
+            top: calc(50% + 80px); 
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 30px;
+            padding: 10px 25px;
             border-radius: 20px;
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.2rem;
-            font-weight: 500; /* Medium weight */
+            font-family: 'TetrisBlocks', sans-serif;
+            font-size: 1rem; /* Reduced */
+            font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
             cursor: pointer;
@@ -186,13 +185,13 @@
             box-shadow: 0 6px 20px rgba(46, 204, 113, 0.7);
         }
 
-        /* --- NEW: Music Toggle Button --- */
+        /* Music Toggle Button */
         #music-toggle {
             position: absolute;
             top: 20px;
-            left: 20px;
-            width: 50px;
-            height: 50px;
+            right: 20px; /* Moved to top-right to balance score */
+            width: 40px;
+            height: 40px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 50%;
             border: 2px solid rgba(255, 255, 255, 0.3);
@@ -200,7 +199,7 @@
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            z-index: 102; /* Higher than others */
+            z-index: 102; 
             pointer-events: auto;
             transition: background-color 0.2s;
         }
@@ -210,8 +209,8 @@
         }
 
         #music-toggle svg {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             fill: white;
         }
 
@@ -225,13 +224,11 @@
     <div id="score-box" class="ui-element">Score: 0</div>
     <div id="level-box" class="ui-element">Level: 1</div>
 
-    <!-- NEW: Music Toggle Button -->
+    <!-- Music Toggle -->
     <button id="music-toggle" aria-label="Toggle Music">
-        <!-- Icon: Sound On -->
         <svg id="icon-sound-on" viewBox="0 0 24 24">
             <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
         </svg>
-        <!-- Icon: Sound Off (Hidden by default) -->
         <svg id="icon-sound-off" viewBox="0 0 24 24" style="display: none;">
             <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
         </svg>
@@ -251,10 +248,15 @@
     
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
-    <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
-    <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
-    <audio id="audio-gameover" src="/music/outro.mp3" preload="auto" playsinline></audio>
-    <audio id="audio-lineclear" src="/music/lineclear.mp3" preload="auto" playsinline></audio>
+    
+    <!-- 
+      CRITICAL: Filenames match exactly what you requested.
+      Ensure your folders are lowercase: /music/
+    -->
+    <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
+    <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
 
     <!-- Three.js -->
     <script type="importmap">
@@ -318,7 +320,7 @@
 
         let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound, ttsAudio;
         let audioUnlocked = false;
-        let isMusicMuted = false; // Track mute state
+        let isMusicMuted = false; 
         let blueGridMat, greenGridMat;
 
         function triggerHaptic(duration = 20) {
@@ -353,12 +355,10 @@
             replayButton = document.getElementById('replay-button');
             ttsAudio = document.getElementById('audio-tts');
             
-            // --- NEW: Music Toggle Setup ---
             musicToggleBtn = document.getElementById('music-toggle');
             iconSoundOn = document.getElementById('icon-sound-on');
             iconSoundOff = document.getElementById('icon-sound-off');
 
-            // Initialize audio variables
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
             rotateSound = document.getElementById('audio-move'); 
@@ -373,18 +373,40 @@
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
+            // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
-                initAudioAndUnlock();
-                // Play music on start (if not muted)
-                if (bgmLoop && !isMusicMuted) {
-                    bgmLoop.play().catch(e => console.error("BGM play failed:", e));
-                }
+                // This code runs on direct user interaction.
+                // It MUST play and (optionally) pause everything to unlock the context.
+                
+                console.log("Unlocking audio context...");
+                const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
+                
+                allSounds.forEach(s => {
+                    if(s) {
+                        // Force play
+                        const p = s.play();
+                        if (p !== undefined) {
+                            p.then(() => {
+                                if(s === bgmLoop) {
+                                    console.log("BGM started successfully");
+                                    // Don't pause BGM
+                                } else {
+                                    // Immediately pause SFX so they are ready but silent
+                                    s.pause();
+                                    s.currentTime = 0;
+                                }
+                            }).catch(e => console.warn("Audio play error:", e));
+                        }
+                    }
+                });
+                
+                audioUnlocked = true;
                 arButton.click(); 
             });
             
             geminiTipButton.addEventListener('click', () => {
                 geminiTipButton.disabled = true;
-                geminiTipButton.textContent = "Processing...";
+                geminiTipButton.textContent = "Thinking...";
                 getGeminiTip();
             });
 
@@ -392,14 +414,13 @@
                 resetGame();
             });
 
-            // --- NEW: Music Toggle Click Handler ---
             musicToggleBtn.addEventListener('click', () => {
                 toggleMusic();
             });
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // Re-verify BGM is playing
+                    // Failsafe check for BGM
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
@@ -432,7 +453,6 @@
             const STRAFE_INTERVAL_MS = 130; 
 
             function onTouchStart(e) {
-                // Allow touches on buttons and music toggle
                 if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle')) return;
 
                 e.preventDefault(); 
@@ -519,18 +539,15 @@
             renderer.setAnimationLoop(animate);
         }
 
-        // --- NEW: Toggle Music Function ---
         function toggleMusic() {
             if (!bgmLoop) return;
 
             if (isMusicMuted) {
-                // Unmute
                 bgmLoop.play().catch(e => console.error("BGM play failed:", e));
                 iconSoundOn.style.display = 'block';
                 iconSoundOff.style.display = 'none';
                 isMusicMuted = false;
             } else {
-                // Mute
                 bgmLoop.pause();
                 iconSoundOn.style.display = 'none';
                 iconSoundOff.style.display = 'block';
@@ -538,44 +555,8 @@
             }
         }
 
-        function initAudioAndUnlock() {
-            if (audioUnlocked) return; 
-            
-            bgmLoop = document.getElementById('audio-bgm');
-            moveSound = document.getElementById('audio-move');
-            rotateSound = document.getElementById('audio-move'); 
-            gameOverSound = document.getElementById('audio-gameover');
-            lineClearSound = document.getElementById('audio-lineclear');
-            
-            const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound, ttsAudio];
-            
-            sounds.forEach(sound => {
-                if (sound) {
-                    sound.load(); 
-                    const playPromise = sound.play();
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            if (sound !== bgmLoop) {
-                                sound.pause();
-                                sound.currentTime = 0;
-                            }
-                        }).catch(e => { console.warn("Audio unlock warning:", e); });
-                    }
-                }
-            });
-
-            bgmLoop.volume = 0.3;
-            moveSound.volume = 0.8;
-            rotateSound.volume = 0.8;
-            gameOverSound.volume = 0.7;
-            if(lineClearSound) lineClearSound.volume = 0.7;
-            ttsAudio.volume = 1.0;
-            
-            audioUnlocked = true;
-        }
-
         function playSound(audioElement) {
-            if (!audioElement || !audioUnlocked) return;
+            if (!audioElement) return;
             audioElement.currentTime = 0; 
             audioElement.play().catch(e => console.warn("Sound play warning:", e)); 
         }
@@ -710,14 +691,12 @@
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             score = 0;
             
-            // Reset Speed
             linesClearedTotal = 0;
             level = 1;
             currentDropSpeed = 1000;
             updateScore(0); 
             levelBox.textContent = `Level: ${level}`;
 
-            // Restart Music if not muted
             if (bgmLoop && !isMusicMuted) {
                 bgmLoop.currentTime = 0;
                 bgmLoop.play().catch(e => console.error("BGM restart failed:", e));

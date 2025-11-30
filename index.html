@@ -2,13 +2,13 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v41 - Hide Mesh Fix)</title>
+    <title>AR Tetris 3D (v43 - Final Polish & Audio)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
-    <!-- Load Google Font: Roboto (Thin weight) -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500&display=swap" rel="stylesheet">
+    <!-- Load Google Font: Montserrat (Medium weight) -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet">
 
     <style>
         /* --- Load Custom Font --- */
@@ -24,8 +24,9 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: 'Roboto', sans-serif; 
-            font-weight: 300; 
+            /* Use Montserrat Medium, fallback to sans-serif */
+            font-family: 'Montserrat', sans-serif; 
+            font-weight: 500; 
             background-color: #111;
             color: white;
             touch-action: none; 
@@ -49,12 +50,12 @@
             position: absolute;
             left: 50%;
             transform: translateX(-50%);
-            padding: 10px 20px;
+            padding: 8px 16px; 
             background-color: rgba(0, 0, 0, 0.6);
-            border-radius: 15px;
+            border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
-            font-size: 1.1rem; 
+            font-size: 1rem; 
             font-weight: 500;
             z-index: 100;
             pointer-events: none; 
@@ -72,10 +73,11 @@
             top: 40%; 
             transform: translate(-50%, -50%);
             color: #FF4136;
-            font-size: 2.2rem; 
+            font-size: 1.8rem; 
             font-weight: bold;
             display: none;
             text-shadow: 2px 2px 0px #000;
+            padding: 20px 40px;
         }
 
         #score-box {
@@ -83,7 +85,7 @@
             left: 20px;
             transform: none; 
             color: #FFDC00;
-            font-size: 1.2rem; 
+            font-size: 1rem; 
             font-weight: bold;
             text-shadow: 1px 1px 0px #000;
             display: none; 
@@ -95,7 +97,7 @@
             left: 20px;
             transform: none;
             color: #00FFFF; 
-            font-size: 1rem; 
+            font-size: 0.9rem; 
             font-weight: bold;
             text-shadow: 1px 1px 0px #000;
             display: none; 
@@ -108,12 +110,12 @@
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 14px 28px;
+            padding: 12px 24px; 
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1.2rem; 
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
@@ -140,7 +142,7 @@
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1rem; 
+            font-size: 0.9rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
@@ -168,7 +170,7 @@
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1rem; 
+            font-size: 0.9rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
@@ -190,8 +192,8 @@
             position: absolute;
             top: 20px;
             right: 20px; 
-            width: 40px;
-            height: 40px;
+            width: 36px; 
+            height: 36px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 50%;
             border: 2px solid rgba(255, 255, 255, 0.3);
@@ -209,8 +211,8 @@
         }
 
         #music-toggle svg {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             fill: white;
         }
         
@@ -233,7 +235,7 @@
         
         #intro-title {
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 3rem;
+            font-size: 2.5rem; 
             color: #FF00FF; 
             text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000;
             margin-bottom: 10px;
@@ -242,9 +244,9 @@
         }
         
         #intro-subtitle {
-            font-family: 'Roboto', sans-serif;
+            font-family: 'Montserrat', sans-serif;
             font-weight: 300;
-            font-size: 1.2rem;
+            font-size: 1rem; 
             color: #00FFFF; 
             text-shadow: 0 0 5px #00FFFF;
             letter-spacing: 4px;
@@ -296,6 +298,7 @@
     
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
+    
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
@@ -466,14 +469,13 @@
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
                     // --- LOWERED VOLUME ---
-                    if (bgmLoop) bgmLoop.volume = 0.12; // 40% of 0.3
+                    if (bgmLoop) bgmLoop.volume = 0.4; // Lowered to 40%
                     
                     // --- LOWERED SFX VOLUME ---
-                    if (moveSound) moveSound.volume = 0.2; // 20% of original
-                    if (rotateSound) rotateSound.volume = 0.2; // 20% of original
-                    // Keep Game Over and Line Clear louder for impact
-                    if (gameOverSound) gameOverSound.volume = 0.7;
-                    if (lineClearSound) lineClearSound.volume = 0.7;
+                    if (moveSound) moveSound.volume = 0.4; // Lowered to 40%
+                    if (rotateSound) rotateSound.volume = 0.4; // Lowered to 40%
+                    if (gameOverSound) gameOverSound.volume = 0.4; // Lowered to 40%
+                    if (lineClearSound) lineClearSound.volume = 0.4; // Lowered to 40%
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -695,7 +697,8 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
-            gameBoard.translateY(baseLift);
+            // --- NEW: Treat floor as a bit lower than detected ---
+            gameBoard.translateY(baseLift - 0.05); // Lower by 5cm
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);

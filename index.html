@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v35 - Force Audio Unlock)</title>
+    <title>AR Tetris 3D (v36 - Music Toggle)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -24,7 +24,6 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Default to Roboto, fallback to sans-serif */
             font-family: 'Roboto', sans-serif; 
             font-weight: 300; 
             background-color: #111;
@@ -60,7 +59,7 @@
             z-index: 100;
             pointer-events: none; 
             letter-spacing: 1px;
-            font-family: 'TetrisBlocks', sans-serif; /* Use Tetris font for UI */
+            font-family: 'TetrisBlocks', sans-serif; 
         }
 
         #message-box {
@@ -81,20 +80,20 @@
 
         #score-box {
             top: 30px;
-            left: 30px;
-            transform: none;
+            left: 50%; /* Center horizontally */
+            transform: translateX(-50%); /* Center align */
             color: #FFDC00;
             font-size: 1.8rem;
             font-weight: bold;
             text-shadow: 2px 2px 0px #000;
+            display: none; /* Hidden initially */
         }
         
-        /* Level Box */
         #level-box {
             top: 70px;
-            left: 30px;
-            transform: none;
-            color: #00FFFF; /* Cyan */
+            left: 50%; /* Center horizontally */
+            transform: translateX(-50%); /* Center align */
+            color: #00FFFF; 
             font-size: 1.2rem;
             font-weight: bold;
             text-shadow: 1px 1px 0px #000;
@@ -185,6 +184,35 @@
             box-shadow: 0 6px 20px rgba(46, 204, 113, 0.7);
         }
 
+        /* --- NEW: Music Toggle Button --- */
+        #music-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 102; /* Higher than others */
+            pointer-events: auto;
+            transition: background-color 0.2s;
+        }
+
+        #music-toggle:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        #music-toggle svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
     </style>
 </head>
 
@@ -192,8 +220,20 @@
     <!-- UI -->
     <div id="message-box" class="ui-element">Scan floor to start</div>
     <div id="game-over-box" class="ui-element">GAME OVER</div>
-    <div id="score-box" class="ui-element" style="display: none;">Score: 0</div>
+    <div id="score-box" class="ui-element">Score: 0</div>
     <div id="level-box" class="ui-element">Level: 1</div>
+
+    <!-- NEW: Music Toggle Button -->
+    <button id="music-toggle" aria-label="Toggle Music">
+        <!-- Icon: Sound On -->
+        <svg id="icon-sound-on" viewBox="0 0 24 24">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+        <!-- Icon: Sound Off (Hidden by default) -->
+        <svg id="icon-sound-off" viewBox="0 0 24 24" style="display: none;">
+            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+    </button>
 
     <button id="custom-ar-button">
         Launch AR
@@ -207,7 +247,7 @@
         Play Again
     </button>
     
-    <!-- Audio (Force Preload) -->
+    <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
     <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
@@ -236,7 +276,8 @@
         let currentPiece = null;
         let gameLoopInterval = null;
         
-        let customArButton, messageBox, scoreBox, levelBox, gameOverBox, geminiTipButton, replayButton;
+        let customArButton, messageBox, scoreBox, levelBox, gameOverBox, geminiTipButton, replayButton, musicToggleBtn;
+        let iconSoundOn, iconSoundOff;
         
         const GAME_STATE = {
             INITIALIZING: 0,
@@ -248,7 +289,7 @@
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
         
-        // --- New Level Variables ---
+        // --- Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
         let currentDropSpeed = 1000; 
@@ -275,6 +316,7 @@
 
         let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound, ttsAudio;
         let audioUnlocked = false;
+        let isMusicMuted = false; // Track mute state
         let blueGridMat, greenGridMat;
 
         function triggerHaptic(duration = 20) {
@@ -308,11 +350,16 @@
             geminiTipButton = document.getElementById('gemini-tip-button');
             replayButton = document.getElementById('replay-button');
             ttsAudio = document.getElementById('audio-tts');
+            
+            // --- NEW: Music Toggle Setup ---
+            musicToggleBtn = document.getElementById('music-toggle');
+            iconSoundOn = document.getElementById('icon-sound-on');
+            iconSoundOff = document.getElementById('icon-sound-off');
 
             // Initialize audio variables
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
-            rotateSound = document.getElementById('audio-move'); // reuse tik
+            rotateSound = document.getElementById('audio-move'); 
             gameOverSound = document.getElementById('audio-gameover');
             lineClearSound = document.getElementById('audio-lineclear');
 
@@ -324,26 +371,12 @@
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
-            // --- FIX: Audio Unlock Logic ---
             customArButton.addEventListener('click', () => {
-                console.log("Unlocking audio...");
-                
-                // Try to play all sounds immediately on user gesture
-                const sounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
-                sounds.forEach(s => {
-                    if(s) {
-                        s.play().then(() => {
-                            if(s !== bgmLoop) {
-                                s.pause(); // Pause SFX immediately
-                                s.currentTime = 0;
-                            } else {
-                                console.log("BGM Started"); // Keep BGM playing
-                            }
-                        }).catch(e => console.error("Audio play error:", e));
-                    }
-                });
-                audioUnlocked = true;
-
+                initAudioAndUnlock();
+                // Play music on start (if not muted)
+                if (bgmLoop && !isMusicMuted) {
+                    bgmLoop.play().catch(e => console.error("BGM play failed:", e));
+                }
                 arButton.click(); 
             });
             
@@ -357,10 +390,15 @@
                 resetGame();
             });
 
+            // --- NEW: Music Toggle Click Handler ---
+            musicToggleBtn.addEventListener('click', () => {
+                toggleMusic();
+            });
+
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
                     // Re-verify BGM is playing
-                    if (bgmLoop && bgmLoop.paused) {
+                    if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
                     
@@ -392,7 +430,8 @@
             const STRAFE_INTERVAL_MS = 130; 
 
             function onTouchStart(e) {
-                if (e.target.tagName === 'BUTTON') return;
+                // Allow touches on buttons and music toggle
+                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle')) return;
 
                 e.preventDefault(); 
                 if (gameState === GAME_STATE.PLACING) {
@@ -420,7 +459,7 @@
             }
             
             function onTouchMove(e) {
-                if (e.target.tagName === 'BUTTON') return;
+                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle')) return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) return;
                 
@@ -437,7 +476,7 @@
             }
             
             function onTouchEnd(e) {
-                if (e.target.tagName === 'BUTTON') return;
+                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle')) return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING) return;
                 if (strafeInterval) clearInterval(strafeInterval);
@@ -478,9 +517,63 @@
             renderer.setAnimationLoop(animate);
         }
 
+        // --- NEW: Toggle Music Function ---
+        function toggleMusic() {
+            if (!bgmLoop) return;
+
+            if (isMusicMuted) {
+                // Unmute
+                bgmLoop.play().catch(e => console.error("BGM play failed:", e));
+                iconSoundOn.style.display = 'block';
+                iconSoundOff.style.display = 'none';
+                isMusicMuted = false;
+            } else {
+                // Mute
+                bgmLoop.pause();
+                iconSoundOn.style.display = 'none';
+                iconSoundOff.style.display = 'block';
+                isMusicMuted = true;
+            }
+        }
+
+        function initAudioAndUnlock() {
+            if (audioUnlocked) return; 
+            
+            bgmLoop = document.getElementById('audio-bgm');
+            moveSound = document.getElementById('audio-move');
+            rotateSound = document.getElementById('audio-move'); 
+            gameOverSound = document.getElementById('audio-gameover');
+            lineClearSound = document.getElementById('audio-lineclear');
+            
+            const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound, ttsAudio];
+            
+            sounds.forEach(sound => {
+                if (sound) {
+                    sound.load(); 
+                    const playPromise = sound.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            if (sound !== bgmLoop) {
+                                sound.pause();
+                                sound.currentTime = 0;
+                            }
+                        }).catch(e => { console.warn("Audio unlock warning:", e); });
+                    }
+                }
+            });
+
+            bgmLoop.volume = 0.3;
+            moveSound.volume = 0.8;
+            rotateSound.volume = 0.8;
+            gameOverSound.volume = 0.7;
+            if(lineClearSound) lineClearSound.volume = 0.7;
+            ttsAudio.volume = 1.0;
+            
+            audioUnlocked = true;
+        }
+
         function playSound(audioElement) {
-            if (!audioElement) return;
-            // Reset time and play. The user interaction in init() should have unlocked this.
+            if (!audioElement || !audioUnlocked) return;
             audioElement.currentTime = 0; 
             audioElement.play().catch(e => console.warn("Sound play warning:", e)); 
         }
@@ -559,411 +652,6 @@
             const depthOffset = -0.5; 
             const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
 
-            const targetPos = new THREE.Vector3();
-            targetPos.setFromMatrixPosition(placementGrid.matrix);
-            
-            gameBoard.position.copy(targetPos);
-            
-            const cameraPos = new THREE.Vector3();
-            camera.getWorldPosition(cameraPos);
-            
-            gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
-            
-            gameBoard.translateY(baseLift);
-            gameBoard.translateZ(depthOffset);
-            
-            scene.add(gameBoard);
-            placementGrid.visible = false; 
-            spawnPiece();
-            
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-        }
-
-        function gameTick() {
-            if (!currentPiece) return;
-            if (isValidMove(currentPiece, { y: 1 })) {
-                currentPiece.userData.gridPos.y += 1;
-                updatePiecePosition(currentPiece);
-            } else {
-                lockPiece();
-                spawnPiece();
-            }
-        }
-        
-        function gameOver() {
-            clearInterval(gameLoopInterval);
-            gameState = GAME_STATE.GAME_OVER;
-            gameOverBox.style.display = 'block';
-            geminiTipButton.style.display = 'block';
-            replayButton.style.display = 'block'; 
-            
-            if (bgmLoop) bgmLoop.pause();
-            playSound(gameOverSound);
-        }
-
-        function resetGame() {
-            gameOverBox.style.display = 'none';
-            geminiTipButton.style.display = 'none';
-            replayButton.style.display = 'none';
-            geminiTipButton.disabled = false;
-            geminiTipButton.textContent = "Get Tip";
-
-            for (let i = gameBoard.children.length - 1; i >= 0; i--) {
-                const child = gameBoard.children[i];
-                gameBoard.remove(child);
-            }
-            grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
-            score = 0;
-            
-            // Reset Speed
-            linesClearedTotal = 0;
-            level = 1;
-            currentDropSpeed = 1000;
-            updateScore(0); 
-            levelBox.textContent = `Level: ${level}`;
-
-            if (bgmLoop) {
-                bgmLoop.currentTime = 0;
-                bgmLoop.play().catch(e => console.error("BGM restart failed:", e));
-            }
-
-            gameState = GAME_STATE.PLAYING;
-            spawnPiece();
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-        }
-
-        function updateScore(linesCleared) {
-            if (linesCleared > 0) {
-                const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
-                score += points[linesCleared] || 0;
-                
-                linesClearedTotal += linesCleared;
-                const newLevel = Math.floor(linesClearedTotal / 5) + 1; 
-                
-                if (newLevel > level) {
-                    level = newLevel;
-                    levelBox.textContent = `Level: ${level}`;
-                    currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
-                    
-                    clearInterval(gameLoopInterval);
-                    gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-                }
-
-                playSound(lineClearSound);
-                const flash = document.createElement('div');
-                flash.style.position = 'absolute';
-                flash.style.top = '0';
-                flash.style.left = '0';
-                flash.style.width = '100%';
-                flash.style.height = '100%';
-                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
-                flash.style.zIndex = '999';
-                flash.style.pointerEvents = 'none'; 
-                document.body.appendChild(flash);
-                setTimeout(() => document.body.removeChild(flash), 100);
-            }
-            scoreBox.textContent = `Score: ${score}`;
-        }
-        
-        function movePiece(direction) {
-            if (!currentPiece) return;
-            if (isValidMove(currentPiece, { x: direction })) {
-                currentPiece.userData.gridPos.x += direction;
-                updatePiecePosition(currentPiece);
-                triggerHaptic(20);
-                playSound(moveSound);
-            }
-        }
-        
-        function updatePiecePosition(piece) {
-            const ud = piece.userData;
-            piece.position.set(
-                (ud.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
-                (BOARD_HEIGHT / 2 - 0.5 - ud.gridPos.y) * BLOCK_SIZE,
-                0 
-            );
-        }
-
-        function spawnPiece() {
-            const typeIndex = Math.floor(Math.random() * SHAPES.length);
-            const rotationIndex = 0; 
-            const shape = SHAPES[typeIndex][rotationIndex];
-            const color = COLORS[typeIndex + 1];
-            
-            const piece = new THREE.Group();
-            piece.userData = { shape: shape, typeIndex: typeIndex, rotationIndex: rotationIndex, gridPos: { x: Math.floor((BOARD_WIDTH - shape[0].length) / 2), y: 0 } };
-            
-            const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-            const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-            const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-            const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-            
-            for (let y = 0; y < shape.length; y++) {
-                for (let x = 0; x < shape[y].length; x++) {
-                    if (shape[y][x]) {
-                        const block = new THREE.Mesh(blockGeo, blockMat);
-                        const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                        block.add( bevel );
-                        block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
-                        piece.add(block);
-                    }
-                }
-            }
-            updatePiecePosition(piece);
-            gameBoard.add(piece);
-            currentPiece = piece;
-            if (!isValidMove(currentPiece, {})) gameOver();
-        }
-        
-        function rotatePiece() {
-            if (!currentPiece) return;
-            const ud = currentPiece.userData;
-            const newRotationIndex = (ud.rotationIndex + 1) % SHAPES[ud.typeIndex].length;
-            const newShape = SHAPES[ud.typeIndex][newRotationIndex];
-            const kicks = [0, 1, -1, 2, -2]; 
-            for (const kick of kicks) {
-                const testPos = { x: ud.gridPos.x + kick, y: ud.gridPos.y };
-                if (isValidMove(currentPiece, { shape: newShape, pos: testPos })) {
-                    ud.rotationIndex = newRotationIndex;
-                    ud.shape = newShape;
-                    ud.gridPos.x = testPos.x; 
-                    while (currentPiece.children.length) currentPiece.remove(currentPiece.children[0]);
-                    
-                    const color = COLORS[ud.typeIndex + 1];
-                    const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-                    const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-                    const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-                    const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-            
-                    for (let y = 0; y < newShape.length; y++) {
-                        for (let x = 0; x < newShape[y].length; x++) {
-                            if (newShape[y][x]) {
-                                const block = new THREE.Mesh(blockGeo, blockMat);
-                                const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                                block.add(bevel);
-                                block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
-                                currentPiece.add(block);
-                            }
-                        }
-                    }
-                    updatePiecePosition(currentPiece);
-                    triggerHaptic(30);
-                    playSound(rotateSound);
-                    return; 
-                }
-            }
-        }
-        
-        function hardDrop() {
-            if (!currentPiece) return;
-            while (isValidMove(currentPiece, { y: 1 })) {
-                currentPiece.userData.gridPos.y += 1;
-            }
-            updatePiecePosition(currentPiece);
-            lockPiece();
-            spawnPiece();
-            clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
-            triggerHaptic(50);
-            playSound(moveSound); 
-        }
-
-        function isValidMove(piece, delta) {
-            const ud = piece.userData;
-            const shape = delta.shape || ud.shape;
-            const newGridX = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
-            const newGridY = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
-
-            for (let y = 0; y < shape.length; y++) {
-                for (let x = 0; x < shape[y].length; x++) {
-                    if (shape[y][x]) {
-                        const boardX = newGridX + x;
-                        const boardY = newGridY + y; 
-                        if (boardX < 0 || boardX >= BOARD_WIDTH) return false;
-                        if (boardY >= BOARD_HEIGHT) return false;
-                        if (boardY >= 0 && grid[boardY][boardX]) return false;
-                    }
-                }
-            }
-            return true;
-        }
-
-        function lockPiece() {
-            if (!currentPiece) return;
-            const ud = currentPiece.userData;
-            const shape = ud.shape;
-            const gridX = ud.gridPos.x;
-            const gridY = ud.gridPos.y; 
-            for (let y = 0; y < shape.length; y++) {
-                for (let x = 0; x < shape[y].length; x++) {
-                    if (shape[y][x]) {
-                        const boardX = gridX + x;
-                        const boardY = gridY + y;
-                        if (boardY < 0 || boardY >= BOARD_HEIGHT) continue; 
-                        grid[boardY][boardX] = ud.typeIndex + 1;
-                        
-                        const color = COLORS[ud.typeIndex + 1];
-                        const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-                        const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-                        const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-                        const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-                        const newBlock = new THREE.Mesh(blockGeo, blockMat);
-                        const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                        newBlock.add(newBevel);
-                        
-                        newBlock.position.set(
-                            (boardX - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
-                            (BOARD_HEIGHT / 2 - 0.5 - boardY) * BLOCK_SIZE,
-                            0
-                        );
-                        gameBoard.add(newBlock);
-                    }
-                }
-            }
-            gameBoard.remove(currentPiece);
-            currentPiece = null;
-            checkLineClears();
-        }
-
-        function checkLineClears() {
-            let linesCleared = 0;
-            let rowsToClear = [];
-            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
-                if (grid[y].every(cell => cell > 0)) {
-                    linesCleared++;
-                    rowsToClear.push(y);
-                }
-            }
-            if (linesCleared > 0) {
-                gameBoard.children = gameBoard.children.filter(block => {
-                    if (block === currentPiece) return true; 
-                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                    return !rowsToClear.includes(blockY); 
-                });
-                for (const y of rowsToClear.sort((a, b) => a - b)) { 
-                    grid.splice(y, 1);
-                    grid.unshift(Array(BOARD_WIDTH).fill(0));
-                }
-                gameBoard.children.forEach(block => {
-                    if (block === currentPiece) return; 
-                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                    let shift = 0;
-                    for (const clearedY of rowsToClear) {
-                        if (blockY < clearedY) shift++;
-                    }
-                    if (shift > 0) block.position.y -= shift * BLOCK_SIZE;
-                });
-                updateScore(linesCleared);
-            }
-        }
-        
-        async function getGeminiTip() {
-            updateMessage("✨ Coach is thinking...");
-            const userPrompt = `I just played Tetris and my final score was ${score}. Give me one short, encouraging, and actionable tip to improve my score next time. Be concise, like a game coach. Max 20 words.`;
-            const apiKey = ""; 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-            const payload = { contents: [{ parts: [{ text: userPrompt }] }] };
-
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
-                const result = await response.json();
-                const tip = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (tip) {
-                    updateMessage(`✨ Coach says: "${tip}"`);
-                    speakTip(tip); 
-                } else {
-                    updateMessage("Couldn't get a tip right now.");
-                }
-            } catch (error) {
-                console.error("Gemini tip error:", error);
-                updateMessage("Error connecting to the coach.");
-            } finally {
-                geminiTipButton.disabled = false;
-                geminiTipButton.textContent = "✨ Get Tip";
-            }
-        }
-        
-        async function speakTip(textToSpeak) {
-            const apiKey = ""; 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-            
-            const payload = {
-                contents: [{ parts: [{ text: `Say this like a friendly game coach: ${textToSpeak}` }] }],
-                generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } },
-                model: "gemini-2.5-flash-preview-tts"
-            };
-
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) throw new Error(`TTS API Error: ${response.statusText}`);
-                const result = await response.json();
-                const part = result?.candidates?.[0]?.content?.parts?.[0];
-                const audioData = part?.inlineData?.data;
-                const mimeType = part?.inlineData?.mimeType;
-
-                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
-                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
-                    const pcmData = base64ToArrayBuffer(audioData);
-                    const pcm16 = new Int16Array(pcmData);
-                    const wavBlob = pcmToWav(pcm16, sampleRate);
-                    const audioUrl = URL.createObjectURL(wavBlob);
-                    ttsAudio.src = audioUrl;
-                    ttsAudio.play();
-                } else {
-                    throw new Error("Invalid TTS audio data received.");
-                }
-            } catch (error) {
-                console.error("Gemini TTS error:", error);
-            }
-        }
-        
-        function base64ToArrayBuffer(base64) {
-            const binaryString = window.atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-            return bytes.buffer;
-        }
-
-        function pcmToWav(pcmData, sampleRate) {
-            const numChannels = 1;
-            const bitsPerSample = 16;
-            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-            const blockAlign = numChannels * bitsPerSample / 8;
-            const dataSize = pcmData.length * 2; 
-            const buffer = new ArrayBuffer(44 + dataSize);
-            const view = new DataView(buffer);
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + dataSize, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true); 
-            view.setUint16(20, 1, true); 
-            view.setUint16(22, numChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, bitsPerSample, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, dataSize, true);
-            for (let i = 0; i < pcmData.length; i++) view.setInt16(44 + i * 2, pcmData[i], true);
-            return new Blob([view], { type: 'audio/wav' });
-        }
-
-        function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
-        }
-    </script></body>
-</html>
+            const
 
 

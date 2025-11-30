@@ -2,18 +2,15 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v31 - Custom Font)</title>
+    <title>AR Tetris 3D (v32 - Modern Thin Font)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
-    <style>
-        /* --- NEW: Load Custom Font --- */
-        @font-face {
-            font-family: 'TetrisBlocks';
-            src: url('font/TetrisBlocks-P99g.ttf') format('truetype');
-        }
+    <!-- Load Google Font: Roboto (Thin weight) -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500&display=swap" rel="stylesheet">
 
+    <style>
         /* Basic reset */
         body, html {
             width: 100%;
@@ -21,8 +18,9 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Apply custom font globally, fallback to sans-serif */
-            font-family: 'TetrisBlocks', 'Segoe UI', sans-serif; 
+            /* Use Roboto Thin/Light */
+            font-family: 'Roboto', sans-serif; 
+            font-weight: 300; /* Light weight */
             background-color: #111;
             color: white;
             touch-action: none; 
@@ -51,11 +49,11 @@
             border-radius: 20px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
-            font-size: 1.5rem; /* Increased size for readability with this font */
-            font-weight: 500;
+            font-size: 1.2rem;
+            font-weight: 300; /* Light/Thin */
             z-index: 100;
             pointer-events: none; 
-            letter-spacing: 1px; /* Helps readability */
+            letter-spacing: 0.5px;
         }
 
         #message-box {
@@ -68,10 +66,11 @@
             top: 50%;
             transform: translate(-50%, -50%);
             color: #FF4136;
-            font-size: 3rem; /* Bigger for Game Over */
-            font-weight: bold;
+            font-size: 3rem; 
+            font-weight: 100; /* Very Thin */
             display: none;
-            text-shadow: 2px 2px 0px #000;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
 
         #score-box {
@@ -79,9 +78,8 @@
             left: 30px;
             transform: none;
             color: #FFDC00;
-            font-size: 1.8rem;
-            font-weight: bold;
-            text-shadow: 2px 2px 0px #000;
+            font-size: 1.5rem;
+            font-weight: 300;
         }
 
         /* Custom AR Button */
@@ -90,13 +88,13 @@
             bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 18px 30px;
+            padding: 16px 32px;
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
-            font-family: 'TetrisBlocks', sans-serif; /* Explicitly set font */
-            font-size: 1.5rem;
-            font-weight: 600;
+            font-family: 'Roboto', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 300; /* Thin */
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
             cursor: pointer;
@@ -104,6 +102,7 @@
             transition: all 0.3s ease;
             pointer-events: auto; 
             text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         #custom-ar-button:hover {
@@ -114,16 +113,16 @@
         /* Gemini Tip Button */
         #gemini-tip-button {
             position: absolute;
-            top: calc(50% + 80px); /* Adjusted position */
+            top: calc(50% + 80px); 
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 20px;
+            padding: 12px 24px;
             border-radius: 20px;
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
-            font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1.2rem;
-            font-weight: 600;
+            font-family: 'Roboto', sans-serif;
+            font-size: 1rem;
+            font-weight: 300;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
             cursor: pointer;
@@ -131,6 +130,8 @@
             transition: all 0.3s ease;
             pointer-events: auto;
             display: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         
         #gemini-tip-button:disabled {
@@ -144,7 +145,7 @@
 
 <body>
     <!-- UI -->
-    <div id="message-box" class="ui-element">Move phone to scan floor</div>
+    <div id="message-box" class="ui-element">Scan floor to start</div>
     <div id="game-over-box" class="ui-element">GAME OVER</div>
     <div id="score-box" class="ui-element" style="display: none;">Score: 0</div>
 
@@ -268,7 +269,7 @@
             
             geminiTipButton.addEventListener('click', () => {
                 geminiTipButton.disabled = true;
-                geminiTipButton.textContent = "Working on it...";
+                geminiTipButton.textContent = "Processing...";
                 getGeminiTip();
             });
 
@@ -281,7 +282,7 @@
                     
                     customArButton.style.display = 'none';
                     gameState = GAME_STATE.SCANNING;
-                    updateMessage("Move phone to scan floor");
+                    updateMessage("Scan floor to start");
 
                     const currentSession = renderer.xr.getSession();
                     currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
@@ -460,14 +461,14 @@
                             if (isFloor) {
                                 if (gameState === GAME_STATE.SCANNING) {
                                     gameState = GAME_STATE.PLACING;
-                                    updateMessage("Tap screen to lock floor");
+                                    updateMessage("Tap to lock");
                                     placementGrid.material = greenGridMat; 
                                     triggerHaptic(50); 
                                 }
                             } else {
                                 if (gameState === GAME_STATE.PLACING) {
                                     gameState = GAME_STATE.SCANNING;
-                                    updateMessage("Move phone to scan floor");
+                                    updateMessage("Scan floor to start");
                                 }
                                 placementGrid.material = blueGridMat; 
                             }
@@ -475,7 +476,7 @@
                             placementGrid.visible = false; 
                             if (gameState === GAME_STATE.PLACING) {
                                 gameState = GAME_STATE.SCANNING;
-                                updateMessage("Move phone to scan floor");
+                                updateMessage("Scan floor to start");
                             }
                         }
                     }
@@ -865,4 +866,5 @@
         }
     </script></body>
 </html>
+
 

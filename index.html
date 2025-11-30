@@ -2,21 +2,17 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v51 - Final Polish)</title>
+    <title>AR Tetris 3D (v55 - UI/UX Overhaul)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
     <!-- Load Google Font: Montserrat (Medium & Bold) -->
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Load Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
-        /* --- Load Custom Font (Unused but kept for reference) --- */
-        @font-face {
-            font-family: 'TetrisBlocks';
-            src: url('font/TetrisBlocks-P99g.ttf') format('truetype');
-        }
-
         /* Basic reset */
         body, html {
             width: 100%;
@@ -31,6 +27,7 @@
             touch-action: none; 
         }
 
+        /* The 3D canvas */
         canvas {
             display: block;
             width: 100%;
@@ -42,201 +39,269 @@
             visibility: hidden !important;
         }
 
-        /* UI Elements */
-        .ui-element {
+        /* --- Shared Glassmorphism Style --- */
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.8); /* Darker, higher opacity */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            color: white;
+            pointer-events: none; /* Default to no interaction */
+        }
+
+        /* --- 1. Unified HUD (Top Left) --- */
+        #hud-panel {
             position: absolute;
-            left: 20px; /* Fixed left alignment */
-            padding: 8px 16px; 
-            background-color: rgba(0, 0, 0, 0.6);
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            text-align: center;
-            font-size: 1rem; 
-            font-weight: 600;
+            top: 20px;
+            left: 20px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
             z-index: 100;
-            pointer-events: none; 
-            letter-spacing: 0.5px;
-            font-family: 'Montserrat', sans-serif; 
-        }
-
-        /* Center the message box specifically */
-        #message-box {
-            left: 50%;
-            transform: translateX(-50%);
-            top: 20px;
-            display: none;
-            max-width: 90%;
+            min-width: 100px;
+            opacity: 0; /* Hidden initially */
+            transition: opacity 0.3s ease;
         }
         
-        #game-over-box {
-            left: 50%;
-            top: 40%; 
-            transform: translate(-50%, -50%);
-            color: #FF4136;
-            font-size: 1.8rem; 
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
             font-weight: 600;
-            display: none;
-            text-shadow: 2px 2px 0px #000;
-            padding: 20px 40px;
-            font-family: 'Montserrat', sans-serif;
-        }
-
-        /* Top Left Stack - No Overlap */
-        #score-box {
-            top: 20px;
-            /* left: 20px set by .ui-element */
-            transform: none; 
-            color: #FFDC00;
-            display: none; 
         }
         
-        #level-box {
-            top: 70px; /* Below Score */
-            /* left: 20px set by .ui-element */
-            transform: none;
-            color: #00FFFF; 
-            font-size: 0.9rem; 
-            display: none; 
+        .hud-label {
+            color: #aaa;
+            font-weight: 400;
+            margin-right: 10px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
         }
 
-        /* Recording Indicator (Red Dot) - Below Level Box */
-        #recording-indicator {
+        .hud-value {
+            color: #FFDC00; /* Gold */
+            font-family: 'Montserrat', monospace; /* Monospace numbers */
+        }
+        
+        #level-value {
+            color: #00FFFF; /* Cyan */
+        }
+
+        /* --- 2. Feedback & Affordance (Recording) --- */
+        #recording-panel {
             position: absolute;
-            top: 120px; /* Below Level */
-            left: 25px; 
-            width: 15px;
-            height: 15px;
-            background-color: red;
+            top: 100px; /* Below HUD */
+            left: 20px;
+            display: none; /* Hidden until needed */
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            z-index: 100;
+        }
+        
+        #recording-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #FF4136;
             border-radius: 50%;
-            display: none; 
-            z-index: 103;
-            box-shadow: 0 0 8px rgba(255, 0, 0, 0.8);
             animation: blink-red 1s infinite;
         }
         
+        #recording-timer {
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            color: #FF4136;
+        }
+
         @keyframes blink-red {
             0% { opacity: 1; }
             50% { opacity: 0.3; }
             100% { opacity: 1; }
         }
 
-        /* Custom AR Button */
-        #custom-ar-button {
+        /* --- 3. Consistent Iconography (Top Right Controls) --- */
+        .control-btn {
             position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 14px 28px;
-            border-radius: 50px;
-            background: linear-gradient(145deg, #8a2be2, #4169e1);
-            color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.1rem; 
-            font-weight: 600;
-            border: none;
-            box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
-            cursor: pointer;
-            z-index: 101;
-            transition: all 0.3s ease;
-            pointer-events: auto; 
-            text-transform: uppercase;
-        }
-
-        /* Replay Button */
-        #replay-button {
-            position: absolute;
-            top: calc(50% + 80px); 
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 10px 25px;
-            border-radius: 20px;
-            background: linear-gradient(145deg, #2ecc71, #27ae60); 
-            color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1rem; 
-            font-weight: 600;
-            border: none;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
-            cursor: pointer;
-            z-index: 101;
-            transition: all 0.3s ease;
-            pointer-events: auto;
-            display: none;
-            text-transform: uppercase;
-        }
-
-        #replay-button:hover {
-            transform: translateX(-50%) scale(1.05);
-            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.7);
-        }
-
-        /* Music Toggle Button (Top Right) */
-        #music-toggle {
-            position: absolute;
-            top: 20px;
-            right: 20px; 
-            width: 36px; 
-            height: 36px;
-            background-color: rgba(0, 0, 0, 0.5);
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.3);
             display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 102; 
-            pointer-events: auto;
-            transition: background-color 0.2s;
-        }
-
-        #music-toggle:hover {
-            background-color: rgba(0, 0, 0, 0.8);
-        }
-
-        #music-toggle svg {
-            width: 18px;
-            height: 18px;
-            fill: white;
-        }
-
-        /* Recording Button (Below Music Toggle) */
-        #record-button {
-            position: absolute;
-            top: 70px; 
-            right: 20px;
-            width: 36px;
-            height: 36px;
-            background-color: rgba(255, 0, 0, 0.7); 
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            display: none; 
             justify-content: center;
             align-items: center;
             cursor: pointer;
             z-index: 102;
             pointer-events: auto;
-            transition: transform 0.1s;
-        }
-
-        #record-button.recording {
-            background-color: rgba(255, 255, 255, 0.9); 
-            animation: pulse-record 1s infinite;
-        }
-
-        #record-button svg {
-            width: 18px;
-            height: 18px;
-            fill: white;
+            transition: transform 0.1s, background-color 0.2s;
+            /* Glass style */
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
         }
         
-        #record-button.recording svg {
-            fill: red; 
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .control-btn .material-icons-round {
+            font-size: 24px;
         }
 
-        @keyframes pulse-record {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+        #music-toggle {
+            top: 20px;
+            right: 20px;
+        }
+
+        #record-button {
+            top: 74px; /* Below music toggle */
+            right: 20px;
+        }
+        
+        #record-button.recording {
+            background: rgba(255, 65, 54, 0.2); /* Red tint */
+            border-color: #FF4136;
+        }
+        
+        #record-button.recording .material-icons-round {
+            color: #FF4136;
+        }
+
+        /* --- 5. Onboarding & Instruction (Message Box) --- */
+        #message-box {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            padding: 12px 24px;
+            text-align: center;
+            display: none; /* Flex when shown */
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        
+        /* Phone sway animation */
+        @keyframes sway {
+            0% { transform: rotate(-10deg); }
+            100% { transform: rotate(10deg); }
+        }
+        
+        .phone-icon {
+            font-size: 20px;
+            animation: sway 1s ease-in-out infinite alternate;
+            display: none; /* Only show during scanning */
+        }
+
+        /* Launch Button Pulse */
+        @keyframes btn-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(138, 43, 226, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(138, 43, 226, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(138, 43, 226, 0); }
+        }
+
+        #custom-ar-button {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 16px 32px;
+            border-radius: 50px;
+            background: linear-gradient(135deg, #8a2be2, #4169e1);
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.1rem; 
+            font-weight: 700;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            cursor: pointer;
+            z-index: 101;
+            transition: transform 0.2s;
+            pointer-events: auto; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            animation: btn-pulse 2s infinite;
+        }
+
+        #custom-ar-button:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+
+        /* --- 6. Game Over Modal --- */
+        #game-over-card {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 300px;
+            padding: 30px 20px;
+            display: none; /* Flex when shown */
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            z-index: 105;
+            text-align: center;
+            pointer-events: auto;
+        }
+        
+        .go-title {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #FF4136;
+            text-transform: uppercase;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .go-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 100%;
+        }
+        
+        .go-stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 5px;
+        }
+        
+        .go-label { color: #aaa; }
+        .go-val { font-weight: 700; }
+
+        #replay-button {
+            padding: 12px 30px;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #2ecc71, #27ae60); 
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1rem; 
+            font-weight: 700;
+            border: none;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+            cursor: pointer;
+            transition: transform 0.1s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+        }
+
+        #replay-button:active {
+            transform: scale(0.95);
         }
         
         /* Intro Screen Styles */
@@ -250,7 +315,8 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: rgba(0, 0, 0, 0.7); 
+            background-color: rgba(0, 0, 0, 0.85); 
+            backdrop-filter: blur(5px);
             z-index: 200; 
             opacity: 0;
             transition: opacity 0.5s ease-in-out;
@@ -258,79 +324,92 @@
         
         #intro-title {
             font-family: 'Montserrat', sans-serif; 
-            font-weight: 800; 
-            font-size: 2.5rem; 
+            font-weight: 900; 
+            font-size: 3rem; 
             color: #FF00FF; 
-            text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000;
-            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+            margin-bottom: 5px;
             text-align: center;
-            animation: pulse 1.5s infinite alternate;
+            letter-spacing: -1px;
+            line-height: 1;
         }
         
         #intro-subtitle {
             font-family: 'Montserrat', sans-serif; 
-            font-weight: 400;
-            font-size: 1rem; 
+            font-weight: 300;
+            font-size: 1.2rem; 
             color: #00FFFF; 
-            text-shadow: 0 0 5px #00FFFF;
-            letter-spacing: 4px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            letter-spacing: 6px;
             text-transform: uppercase;
-        }
-        
-        @keyframes pulse {
-            from { transform: scale(1); text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000; }
-            to { transform: scale(1.05); text-shadow: 0 0 20px #FF00FF, 2px 2px 0 #000; }
         }
 
     </style>
 </head>
 
 <body>
-    <!-- UI -->
-    <div id="message-box" class="ui-element">Scan floor to start</div>
-    <div id="game-over-box" class="ui-element">GAME OVER</div>
-    
-    <!-- Re-ordered for Top Left Alignment -->
-    <div id="score-box" class="ui-element">Score: 0</div>
-    <div id="level-box" class="ui-element">Level: 1</div>
-    <div id="recording-indicator"></div>
+    <!-- 1. Unified HUD -->
+    <div id="hud-panel" class="glass-panel">
+        <div class="hud-row">
+            <span class="hud-label">Score</span>
+            <span class="hud-value" id="score-val">0</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Level</span>
+            <span class="hud-value" id="level-val">1</span>
+        </div>
+    </div>
+
+    <!-- 2. Feedback (Recording) -->
+    <div id="recording-panel">
+        <div id="recording-dot"></div>
+        <div id="recording-timer" id="rec-time">00:00</div>
+    </div>
+
+    <!-- 5. Onboarding Message -->
+    <div id="message-box" class="glass-panel">
+        <span class="material-icons-round phone-icon">smartphone</span>
+        <span id="message-text">Scan floor to start</span>
+    </div>
+
+    <!-- 6. Game Over Modal -->
+    <div id="game-over-card" class="glass-panel">
+        <h1 class="go-title">Game Over</h1>
+        <div class="go-stats">
+            <div class="go-stat-row">
+                <span class="go-label">Score</span>
+                <span class="go-val" id="go-score">0</span>
+            </div>
+            <div class="go-stat-row">
+                <span class="go-label">Level</span>
+                <span class="go-val" id="go-level">1</span>
+            </div>
+        </div>
+        <button id="replay-button">
+            <span class="material-icons-round" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;">replay</span>
+            Play Again
+        </button>
+    </div>
 
     <!-- Intro Screen -->
     <div id="intro-screen">
-        <div id="intro-title">ROCKIN' TETRIS</div>
+        <div id="intro-title">ROCKIN'<br>TETRIS</div>
         <div id="intro-subtitle">in AR</div>
     </div>
 
+    <!-- 3. Consistent Icons -->
     <!-- Music Toggle -->
-    <button id="music-toggle" aria-label="Toggle Music">
-        <svg id="icon-sound-on" viewBox="0 0 24 24">
-            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-        </svg>
-        <svg id="icon-sound-off" viewBox="0 0 24 24" style="display: none;">
-            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-        </svg>
+    <button id="music-toggle" class="control-btn" aria-label="Toggle Music">
+        <span class="material-icons-round" id="icon-music">volume_up</span>
     </button>
 
     <!-- Recording Button -->
-    <button id="record-button" aria-label="Record Video">
-        <!-- Circle Icon for Record -->
-        <svg id="icon-record" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="8" />
-        </svg>
-        <!-- Square Icon for Stop (hidden by default) -->
-        <svg id="icon-stop" viewBox="0 0 24 24" style="display: none;">
-            <rect x="6" y="6" width="12" height="12" />
-        </svg>
+    <button id="record-button" class="control-btn" aria-label="Record Video">
+        <span class="material-icons-round" id="icon-record-btn">fiber_manual_record</span>
     </button>
 
     <button id="custom-ar-button">
         Launch AR
-    </button>
-    
-    <!-- Removed Tip Button -->
-
-    <button id="replay-button">
-        Play Again
     </button>
     
     <!-- Audio -->
@@ -340,7 +419,6 @@
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
-    <!-- TOOT Sound -->
     <audio id="audio-toot" src="data:audio/wav;base64,UklGRl9vT1ZYXxcqU1qa..." preload="auto" playsinline></audio>
 
     <!-- Three.js -->
@@ -365,12 +443,18 @@
         let currentPiece = null;
         let gameLoopInterval = null;
         
-        let customArButton, messageBox, scoreBox, levelBox, gameOverBox, replayButton, musicToggleBtn;
-        let iconSoundOn, iconSoundOff;
-        let recordButton, iconRecord, iconStop, recordingIndicator;
+        // UI Vars
+        let customArButton, messageBox, messageText, phoneIcon;
+        let hudPanel, scoreVal, levelVal;
+        let gameOverCard, goScore, goLevel, replayButton;
+        let musicToggleBtn, musicIcon, recordButton, recordIcon;
+        let recordingPanel, recTimer;
+        
         let mediaRecorder;
         let recordedChunks = [];
         let isRecording = false;
+        let recStartTime;
+        let recInterval;
         
         let introScreen;
         
@@ -453,23 +537,31 @@
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
             
+            // Bind UI Elements
             customArButton = document.getElementById('custom-ar-button');
+            
             messageBox = document.getElementById('message-box');
-            scoreBox = document.getElementById('score-box');
-            levelBox = document.getElementById('level-box');
-            gameOverBox = document.getElementById('game-over-box');
+            messageText = document.getElementById('message-text');
+            phoneIcon = document.querySelector('.phone-icon');
+            
+            hudPanel = document.getElementById('hud-panel');
+            scoreVal = document.getElementById('score-val');
+            levelVal = document.getElementById('level-val');
+            
+            gameOverCard = document.getElementById('game-over-card');
+            goScore = document.getElementById('go-score');
+            goLevel = document.getElementById('go-level');
             replayButton = document.getElementById('replay-button');
             
             introScreen = document.getElementById('intro-screen');
             
             musicToggleBtn = document.getElementById('music-toggle');
-            iconSoundOn = document.getElementById('icon-sound-on');
-            iconSoundOff = document.getElementById('icon-sound-off');
-
+            musicIcon = document.getElementById('icon-music');
+            
             recordButton = document.getElementById('record-button');
-            iconRecord = document.getElementById('icon-record');
-            iconStop = document.getElementById('icon-stop');
-            recordingIndicator = document.getElementById('recording-indicator');
+            iconRecord = document.getElementById('icon-record-btn');
+            recordingPanel = document.getElementById('recording-panel');
+            recTimer = document.getElementById('recording-timer');
 
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
@@ -534,21 +626,23 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // Volume Settings (all very low)
+                    // Volume Settings
                     if (bgmLoop) bgmLoop.volume = 0.05; 
                     if (moveSound) moveSound.volume = 0.15; 
                     if (rotateSound) rotateSound.volume = 0.15; 
-                    if (gameOverSound) gameOverSound.volume = 0.1; // Very Low
-                    if (lineClearSound) lineClearSound.volume = 0.1; // Very Low
+                    if (gameOverSound) gameOverSound.volume = 0.1; 
+                    if (lineClearSound) lineClearSound.volume = 0.1; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
                     
                     customArButton.style.display = 'none';
+                    // Show Controls
                     recordButton.style.display = 'flex';
+                    
                     gameState = GAME_STATE.SCANNING;
-                    updateMessage("Scan floor to start");
+                    updateMessage("Scan floor to start", true); // Show icon
 
                     const currentSession = renderer.xr.getSession();
                     currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
@@ -568,6 +662,7 @@
                 window.location.reload();
             });
 
+            // Touch Controls
             let touchStartX, touchStartY, touchStartTime;
             let strafeInterval = null;
             let isDragging = false;
@@ -575,11 +670,11 @@
             const STRAFE_INTERVAL_MS = 130; 
 
             function onTouchStart(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
+                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button') || e.target.closest('#replay-button')) return;
 
                 e.preventDefault(); 
                 if (gameState === GAME_STATE.PLACING) {
-                    updateMessage(""); 
+                    updateMessage("", false); 
                     playIntroAndStart(); 
                     return; 
                 }
@@ -643,6 +738,7 @@
 
             window.addEventListener('resize', onWindowResize);
             
+            // Materials
             blueGridMat = new THREE.MeshBasicMaterial({ color: 0x00FFFF, wireframe: true, transparent: true, opacity: 0.7 });
             greenGridMat = new THREE.MeshBasicMaterial({ color: 0x00FF00, wireframe: true, transparent: true, opacity: 0.8 });
 
@@ -665,7 +761,7 @@
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
             } catch (e) {
                 console.error("MediaRecorder setup failed:", e);
-                updateMessage("Recording not supported");
+                // updateMessage("Recording not supported"); // Dont show msg in HUD
                 return;
             }
 
@@ -676,26 +772,29 @@
             isRecording = true;
             
             recordButton.classList.add('recording');
-            iconRecord.style.display = 'none';
-            iconStop.style.display = 'block';
-            recordingIndicator.style.display = 'block'; 
+            iconRecord.textContent = "stop"; // Change icon using text (material icons)
+            recordingPanel.style.display = 'flex';
             
-            updateMessage("Recording Started...");
-            setTimeout(() => { if(gameState === GAME_STATE.PLAYING) updateMessage("", true) }, 1500);
+            // Start timer
+            recStartTime = Date.now();
+            recInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+                const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const s = (elapsed % 60).toString().padStart(2, '0');
+                recTimer.textContent = `${m}:${s}`;
+            }, 1000);
         }
 
         function stopRecording() {
             if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
                 isRecording = false;
+                clearInterval(recInterval);
                 
-                // Update UI
                 recordButton.classList.remove('recording');
-                iconRecord.style.display = 'block';
-                iconStop.style.display = 'none';
-                recordingIndicator.style.display = 'none'; 
-                
-                updateMessage("Processing video...");
+                iconRecord.textContent = "fiber_manual_record";
+                recordingPanel.style.display = 'none';
+                recTimer.textContent = "00:00";
             }
         }
 
@@ -708,9 +807,7 @@
                     title: 'My AR Tetris Gameplay!',
                     text: 'Check out this cool AR Tetris game!',
                     files: [file]
-                })
-                .then(() => { updateMessage("Shared!", true); })
-                .catch((error) => { downloadVideo(blob); });
+                }).catch((error) => { downloadVideo(blob); });
             } else {
                 downloadVideo(blob);
             }
@@ -725,7 +822,6 @@
             a.download = 'ar-tetris-gameplay.mp4';
             a.click();
             window.URL.revokeObjectURL(url);
-            updateMessage("Video downloaded!", true);
         }
 
         function toggleMusic() {
@@ -733,13 +829,11 @@
 
             if (isMusicMuted) {
                 bgmLoop.play().catch(e => console.error("BGM play failed:", e));
-                iconSoundOn.style.display = 'block';
-                iconSoundOff.style.display = 'none';
+                musicIcon.textContent = "volume_up";
                 isMusicMuted = false;
             } else {
                 bgmLoop.pause();
-                iconSoundOn.style.display = 'none';
-                iconSoundOff.style.display = 'block';
+                musicIcon.textContent = "volume_off";
                 isMusicMuted = true;
             }
         }
@@ -777,27 +871,26 @@
                             if (isFloor) {
                                 if (gameState === GAME_STATE.SCANNING) {
                                     gameState = GAME_STATE.PLACING;
-                                    updateMessage("Tap to lock");
+                                    updateMessage("Tap to lock", false);
                                     placementGrid.material = greenGridMat; 
                                     triggerHaptic(50); 
                                 }
                             } else {
                                 if (gameState === GAME_STATE.PLACING) {
                                     gameState = GAME_STATE.SCANNING;
-                                    updateMessage("Scan floor to start");
+                                    updateMessage("Scan floor to start", true);
+                                    placementGrid.material = blueGridMat; 
                                 }
-                                placementGrid.material = blueGridMat; 
                             }
                         } else {
                             placementGrid.visible = false; 
                             if (gameState === GAME_STATE.PLACING) {
                                 gameState = GAME_STATE.SCANNING;
-                                updateMessage("Scan floor to start");
+                                updateMessage("Scan floor to start", true);
                             }
                         }
                     }
                 } else {
-                    // Force hide mesh when PLAYING or GAME_OVER
                     placementGrid.visible = false;
                 }
             }
@@ -810,12 +903,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function updateMessage(message, autoHide = false) {
-            messageBox.textContent = message;
-            messageBox.style.display = 'block';
-            if (autoHide) {
-                setTimeout(() => { messageBox.style.display = 'none'; }, 2000);
-            }
+        function updateMessage(message, showIcon = false) {
+            messageText.textContent = message;
+            messageBox.style.display = message ? 'flex' : 'none';
+            phoneIcon.style.display = showIcon ? 'block' : 'none';
         }
 
         function playIntroAndStart() {
@@ -838,32 +929,29 @@
             placementGrid.visible = false; 
             
             introScreen.style.display = 'flex';
-            
-            setTimeout(() => {
-                introScreen.style.opacity = '1';
-            }, 50); 
+            introScreen.style.opacity = '0'; // Start invisible
 
+            // Fade In
+            setTimeout(() => { introScreen.style.opacity = '1'; }, 50); 
+
+            // Fade Out
             setTimeout(() => {
                 introScreen.style.opacity = '0';
-                
                 setTimeout(() => {
                     introScreen.style.display = 'none';
                     startGame();
                 }, 500); 
-                
             }, 2500); 
         }
 
         function startGame() {
             gameState = GAME_STATE.PLAYING;
-            scoreBox.style.display = 'block';
-            levelBox.style.display = 'block'; 
+            hudPanel.style.opacity = '1'; // Show HUD
             updateScore(0);
             
             placementGrid.visible = false;
 
             spawnPiece();
-            
             gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
@@ -881,44 +969,44 @@
         function gameOver() {
             clearInterval(gameLoopInterval);
             gameState = GAME_STATE.GAME_OVER;
-            gameOverBox.style.display = 'block';
-            replayButton.style.display = 'block'; 
+            
+            goScore.textContent = score;
+            goLevel.textContent = level;
+            gameOverCard.style.display = 'flex';
             
             if (bgmLoop) bgmLoop.pause();
             playSound(gameOverSound);
         }
 
-        // 7. Reset game: Go back to scanning
         function resetGame() {
-            gameOverBox.style.display = 'none';
-            replayButton.style.display = 'none';
+            gameOverCard.style.display = 'none';
             
-            // Clear current board
             for (let i = gameBoard.children.length - 1; i >= 0; i--) {
-                gameBoard.remove(gameBoard.children[i]);
+                const child = gameBoard.children[i];
+                gameBoard.remove(child);
             }
             scene.remove(gameBoard); 
             gameBoard = new THREE.Group(); 
 
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             score = 0;
+            
             linesClearedTotal = 0;
             level = 1;
             currentDropSpeed = 1000;
             
-            scoreBox.style.display = 'none';
-            levelBox.style.display = 'none';
+            // Hide HUD
+            hudPanel.style.opacity = '0';
 
-            // Reset Music
             if (bgmLoop && !isMusicMuted) {
                 bgmLoop.currentTime = 0;
                 bgmLoop.play().catch(e => console.error("BGM restart failed:", e));
             }
 
-            // Reset to SCANNING state
+            // 7. RESET TO SCANNING
             gameState = GAME_STATE.SCANNING;
-            updateMessage("Scan floor to start");
-            placementGrid.visible = false; // Will reappear when hit test works
+            updateMessage("Scan floor to start", true);
+            placementGrid.visible = false; 
         }
 
         function updateScore(linesCleared) {
@@ -931,27 +1019,16 @@
                 
                 if (newLevel > level) {
                     level = newLevel;
-                    levelBox.textContent = `Level: ${level}`;
                     currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
-                    
                     clearInterval(gameLoopInterval);
                     gameLoopInterval = setInterval(gameTick, currentDropSpeed);
                 }
 
                 playSound(lineClearSound);
-                const flash = document.createElement('div');
-                flash.style.position = 'absolute';
-                flash.style.top = '0';
-                flash.style.left = '0';
-                flash.style.width = '100%';
-                flash.style.height = '100%';
-                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
-                flash.style.zIndex = '999';
-                flash.style.pointerEvents = 'none'; 
-                document.body.appendChild(flash);
-                setTimeout(() => document.body.removeChild(flash), 100);
             }
-            scoreBox.textContent = `Score: ${score}`;
+            // Update HUD
+            scoreVal.textContent = score;
+            levelVal.textContent = level;
         }
         
         function checkLineClears() {
@@ -965,55 +1042,65 @@
             }
             
             if (linesCleared > 0) {
-                // 4. Slow animation for clearing (Pause game)
+                // 4. Slow Animation (Pause Game)
                 clearInterval(gameLoopInterval);
 
-                // Visual feedback on blocks
+                const blocksToAnimate = [];
                 gameBoard.children.forEach(block => {
                     const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
                     if (rowsToClear.includes(blockY)) {
-                        // Animate scale down
-                        let scale = 1;
-                        const fadeInterval = setInterval(() => {
-                            scale -= 0.1;
-                            if (scale <= 0) {
-                                clearInterval(fadeInterval);
-                                block.visible = false;
-                            } else {
-                                block.scale.setScalar(scale);
-                            }
-                        }, 50); // 50ms * 10 steps = 500ms animation
+                        blocksToAnimate.push(block);
                     }
                 });
 
-                // Wait 1 second then process physical clear
-                setTimeout(() => {
-                    // Process removal
-                    gameBoard.children = gameBoard.children.filter(block => {
-                        if (block === currentPiece) return true; 
-                        const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                        return !rowsToClear.includes(blockY); 
-                    });
-                    for (const y of rowsToClear.sort((a, b) => a - b)) { 
-                        grid.splice(y, 1);
-                        grid.unshift(Array(BOARD_WIDTH).fill(0));
-                    }
-                    gameBoard.children.forEach(block => {
-                        if (block === currentPiece) return; 
-                        const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                        let shift = 0;
-                        for (const clearedY of rowsToClear) {
-                            if (blockY < clearedY) shift++;
-                        }
-                        if (shift > 0) block.position.y -= shift * BLOCK_SIZE;
-                    });
-                    
-                    updateScore(linesCleared);
-                    
-                    // Resume game
-                    gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                let progress = 0;
+                const duration = 1000; // 1 second
+                const startTime = Date.now();
 
-                }, 1000); // 1 second delay
+                function animateClear() {
+                    const now = Date.now();
+                    progress = (now - startTime) / duration;
+
+                    if (progress < 1) {
+                        blocksToAnimate.forEach(b => {
+                            // Spin & Shrink
+                            b.scale.setScalar(1 - progress);
+                            b.rotation.y += 0.2; 
+                            b.rotation.z += 0.1;
+                        });
+                        requestAnimationFrame(animateClear);
+                    } else {
+                        // Done animating, remove blocks
+                        gameBoard.children = gameBoard.children.filter(block => {
+                            if (block === currentPiece) return true; 
+                            const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                            return !rowsToClear.includes(blockY); 
+                        });
+                        
+                        // Shift Grid
+                        for (const y of rowsToClear.sort((a, b) => a - b)) { 
+                            grid.splice(y, 1);
+                            grid.unshift(Array(BOARD_WIDTH).fill(0));
+                        }
+                        
+                        // Shift Visual Blocks
+                        gameBoard.children.forEach(block => {
+                            if (block === currentPiece) return; 
+                            const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                            let shift = 0;
+                            for (const clearedY of rowsToClear) {
+                                if (blockY < clearedY) shift++;
+                            }
+                            if (shift > 0) block.position.y -= shift * BLOCK_SIZE;
+                        });
+                        
+                        updateScore(linesCleared);
+                        
+                        // Resume Game
+                        gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                    }
+                }
+                animateClear();
             }
         }
 
@@ -1023,6 +1110,7 @@
                 currentPiece.userData.gridPos.x += direction;
                 updatePiecePosition(currentPiece);
                 triggerHaptic(5); 
+                // Sound removed for normal moves
             }
         }
         

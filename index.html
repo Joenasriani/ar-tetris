@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v34 - Speed Increase)</title>
+    <title>AR Tetris 3D (v35 - Force Audio Unlock)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500&display=swap" rel="stylesheet">
 
     <style>
-        /* --- NEW: Load Custom Font --- */
+        /* --- Load Custom Font --- */
         @font-face {
             font-family: 'TetrisBlocks';
             src: url('font/TetrisBlocks-P99g.ttf') format('truetype');
@@ -24,8 +24,9 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Apply custom font globally, fallback to sans-serif */
-            font-family: 'TetrisBlocks', 'Segoe UI', sans-serif; 
+            /* Default to Roboto, fallback to sans-serif */
+            font-family: 'Roboto', sans-serif; 
+            font-weight: 300; 
             background-color: #111;
             color: white;
             touch-action: none; 
@@ -59,6 +60,7 @@
             z-index: 100;
             pointer-events: none; 
             letter-spacing: 1px;
+            font-family: 'TetrisBlocks', sans-serif; /* Use Tetris font for UI */
         }
 
         #message-box {
@@ -87,7 +89,7 @@
             text-shadow: 2px 2px 0px #000;
         }
         
-        /* NEW: Level Box */
+        /* Level Box */
         #level-box {
             top: 70px;
             left: 30px;
@@ -96,7 +98,8 @@
             font-size: 1.2rem;
             font-weight: bold;
             text-shadow: 1px 1px 0px #000;
-            display: none; /* Hidden until game starts */
+            display: none; 
+            font-family: 'TetrisBlocks', sans-serif;
         }
 
         /* Custom AR Button */
@@ -204,7 +207,7 @@
         Play Again
     </button>
     
-    <!-- Audio -->
+    <!-- Audio (Force Preload) -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
     <audio id="audio-bgm" src="/music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="/music/tik.mp3" preload="auto" playsinline></audio>
@@ -248,8 +251,8 @@
         // --- New Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
-        let currentDropSpeed = 1000; // Start at 1 second per drop
-        const MIN_DROP_SPEED = 100; // Fastest speed (0.1s per drop)
+        let currentDropSpeed = 1000; 
+        const MIN_DROP_SPEED = 100; 
 
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20; 
@@ -306,6 +309,13 @@
             replayButton = document.getElementById('replay-button');
             ttsAudio = document.getElementById('audio-tts');
 
+            // Initialize audio variables
+            bgmLoop = document.getElementById('audio-bgm');
+            moveSound = document.getElementById('audio-move');
+            rotateSound = document.getElementById('audio-move'); // reuse tik
+            gameOverSound = document.getElementById('audio-gameover');
+            lineClearSound = document.getElementById('audio-lineclear');
+
             const arButton = ARButton.createButton(renderer, {
                 requiredFeatures: ['hit-test'], 
                 optionalFeatures: ['dom-overlay', 'local-floor'], 
@@ -314,11 +324,26 @@
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
+            // --- FIX: Audio Unlock Logic ---
             customArButton.addEventListener('click', () => {
-                initAudioAndUnlock();
-                if (bgmLoop) {
-                    bgmLoop.play().catch(e => console.error("BGM play failed:", e));
-                }
+                console.log("Unlocking audio...");
+                
+                // Try to play all sounds immediately on user gesture
+                const sounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
+                sounds.forEach(s => {
+                    if(s) {
+                        s.play().then(() => {
+                            if(s !== bgmLoop) {
+                                s.pause(); // Pause SFX immediately
+                                s.currentTime = 0;
+                            } else {
+                                console.log("BGM Started"); // Keep BGM playing
+                            }
+                        }).catch(e => console.error("Audio play error:", e));
+                    }
+                });
+                audioUnlocked = true;
+
                 arButton.click(); 
             });
             
@@ -334,9 +359,9 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    if (!audioUnlocked) initAudioAndUnlock(); 
+                    // Re-verify BGM is playing
                     if (bgmLoop && bgmLoop.paused) {
-                        bgmLoop.play().catch(e => console.error("BGM error:", e));
+                        bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
                     
                     customArButton.style.display = 'none';
@@ -453,44 +478,9 @@
             renderer.setAnimationLoop(animate);
         }
 
-        function initAudioAndUnlock() {
-            if (audioUnlocked) return; 
-            
-            bgmLoop = document.getElementById('audio-bgm');
-            moveSound = document.getElementById('audio-move');
-            rotateSound = document.getElementById('audio-move'); 
-            gameOverSound = document.getElementById('audio-gameover');
-            lineClearSound = document.getElementById('audio-lineclear');
-            
-            const sounds = [bgmLoop, moveSound, rotateSound, gameOverSound, lineClearSound, ttsAudio];
-            
-            sounds.forEach(sound => {
-                if (sound) {
-                    sound.load(); 
-                    const playPromise = sound.play();
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            if (sound !== bgmLoop) {
-                                sound.pause();
-                                sound.currentTime = 0;
-                            }
-                        }).catch(e => { console.warn("Audio unlock warning:", e); });
-                    }
-                }
-            });
-
-            bgmLoop.volume = 0.3;
-            moveSound.volume = 0.8;
-            rotateSound.volume = 0.8;
-            gameOverSound.volume = 0.7;
-            if(lineClearSound) lineClearSound.volume = 0.7;
-            ttsAudio.volume = 1.0;
-            
-            audioUnlocked = true;
-        }
-
         function playSound(audioElement) {
-            if (!audioElement || !audioUnlocked) return;
+            if (!audioElement) return;
+            // Reset time and play. The user interaction in init() should have unlocked this.
             audioElement.currentTime = 0; 
             audioElement.play().catch(e => console.warn("Sound play warning:", e)); 
         }
@@ -563,7 +553,7 @@
         function startGame() {
             gameState = GAME_STATE.PLAYING;
             scoreBox.style.display = 'block';
-            levelBox.style.display = 'block'; // Show level
+            levelBox.style.display = 'block'; 
             updateScore(0);
             
             const depthOffset = -0.5; 
@@ -586,7 +576,6 @@
             placementGrid.visible = false; 
             spawnPiece();
             
-            // Use currentDropSpeed
             gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
@@ -648,17 +637,14 @@
                 const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
                 score += points[linesCleared] || 0;
                 
-                // --- NEW: Increase Speed ---
                 linesClearedTotal += linesCleared;
-                const newLevel = Math.floor(linesClearedTotal / 5) + 1; // Level up every 5 lines
+                const newLevel = Math.floor(linesClearedTotal / 5) + 1; 
                 
                 if (newLevel > level) {
                     level = newLevel;
                     levelBox.textContent = `Level: ${level}`;
-                    // Increase speed (decrease interval) by 10% per level
                     currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
                     
-                    // Clear old interval and start new one with faster speed
                     clearInterval(gameLoopInterval);
                     gameLoopInterval = setInterval(gameTick, currentDropSpeed);
                 }
@@ -777,7 +763,7 @@
             lockPiece();
             spawnPiece();
             clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed); // use current speed
+            gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(50);
             playSound(moveSound); 
         }

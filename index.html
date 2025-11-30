@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
-    <!-- Load Google Font: Montserrat (Medium & Bold) -->
+    <!-- Load Google Font: Montserrat (Regular & SemiBold) -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
@@ -18,7 +18,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* 1. Font changed to Montserrat */
+            /* Use Montserrat, fallback to sans-serif */
             font-family: 'Montserrat', sans-serif; 
             font-weight: 400; 
             background-color: #111;
@@ -294,6 +294,11 @@
     
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
+    
+    <!-- 
+      CRITICAL: Filenames match exactly what you requested.
+      Ensure your folders are lowercase: /music/
+    -->
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
@@ -367,7 +372,6 @@
         let blueGridMat, greenGridMat;
 
         function triggerHaptic(duration = 20) {
-            // 3. Haptics are on
             if (navigator.vibrate) navigator.vibrate(duration);
         }
         
@@ -422,7 +426,7 @@
             // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
                 console.log("Unlocking audio context...");
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on launch
                 const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
                 
                 allSounds.forEach(s => {
@@ -448,29 +452,31 @@
             geminiTipButton.addEventListener('click', () => {
                 geminiTipButton.disabled = true;
                 geminiTipButton.textContent = "Thinking...";
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on tip click
                 getGeminiTip();
             });
 
             replayButton.addEventListener('click', () => {
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on replay click
                 resetGame();
             });
 
             musicToggleBtn.addEventListener('click', () => {
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on music toggle
                 toggleMusic();
             });
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // 4. Music and sfx are very low in volume
-                    if (bgmLoop) bgmLoop.volume = 0.08; // Lowered further
+                    // --- LOWERED VOLUME ---
+                    if (bgmLoop) bgmLoop.volume = 0.05; // Very low for background (around 0.12 * 0.4)
                     
-                    if (moveSound) moveSound.volume = 0.1; // Very Low
-                    if (rotateSound) rotateSound.volume = 0.1; // Very Low
-                    if (gameOverSound) gameOverSound.volume = 0.1; // Very Low
-                    if (lineClearSound) lineClearSound.volume = 0.1; // Very Low
+                    // --- LOWERED SFX VOLUME ---
+                    if (moveSound) moveSound.volume = 0.15; // Very low
+                    if (rotateSound) rotateSound.volume = 0.15; // Very low
+                    // Keep Game Over and Line Clear louder for impact but still low
+                    if (gameOverSound) gameOverSound.volume = 0.3;
+                    if (lineClearSound) lineClearSound.volume = 0.3;
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -659,6 +665,7 @@
                         }
                     }
                 } else {
+                    // --- FIX: Force hide mesh when PLAYING or GAME_OVER ---
                     placementGrid.visible = false;
                 }
             }
@@ -691,8 +698,8 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
-            // 2. Always treat the floor in the game a bit lower than where it is
-            gameBoard.translateY(baseLift - 0.15); // Lowered by 15cm
+            // --- NEW: Treat floor as a bit lower than detected ---
+            gameBoard.translateY(baseLift - 0.08); // Lowered by 8cm
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
@@ -721,6 +728,7 @@
             levelBox.style.display = 'block'; 
             updateScore(0);
             
+            // Ensure green mesh is hidden
             placementGrid.visible = false;
 
             spawnPiece();
@@ -818,7 +826,8 @@
             if (isValidMove(currentPiece, { x: direction })) {
                 currentPiece.userData.gridPos.x += direction;
                 updatePiecePosition(currentPiece);
-                triggerHaptic(5); 
+                triggerHaptic(5); // Short haptic on move
+                // playSound(moveSound); // Tik sound disabled on move
             }
         }
         
@@ -894,7 +903,7 @@
                         }
                     }
                     updatePiecePosition(currentPiece);
-                    triggerHaptic(5); 
+                    triggerHaptic(5); // Short haptic on rotate
                     playSound(rotateSound);
                     return; 
                 }
@@ -912,7 +921,7 @@
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
-            // playSound(moveSound); 
+            // playSound(moveSound); // Disabled on hard drop too
         }
 
         function isValidMove(piece, delta) {

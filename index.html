@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v38 - Smaller Fonts & Enforced Audio)</title>
+    <title>AR Tetris 3D (v40 - Audio Tweak & Hide Mesh)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -343,6 +343,7 @@
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
         
+        // --- Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
         let currentDropSpeed = 1000; 
@@ -427,6 +428,7 @@
             // --- STRICT AUDIO UNLOCK ON CLICK ---
             customArButton.addEventListener('click', () => {
                 console.log("Unlocking audio context...");
+                triggerHaptic(5); // Short haptic on launch
                 const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
                 
                 allSounds.forEach(s => {
@@ -452,22 +454,32 @@
             geminiTipButton.addEventListener('click', () => {
                 geminiTipButton.disabled = true;
                 geminiTipButton.textContent = "Thinking...";
+                triggerHaptic(5); // Short haptic on tip click
                 getGeminiTip();
             });
 
             replayButton.addEventListener('click', () => {
+                triggerHaptic(5); // Short haptic on replay click
                 resetGame();
             });
 
             musicToggleBtn.addEventListener('click', () => {
+                triggerHaptic(5); // Short haptic on music toggle
                 toggleMusic();
             });
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // --- NEW: Lower Initial Volume (40% of 0.3 which was original) ---
-                    if (bgmLoop) bgmLoop.volume = 0.12; 
+                    // --- LOWERED VOLUME ---
+                    if (bgmLoop) bgmLoop.volume = 0.12; // 40% of 0.3
                     
+                    // --- LOWERED SFX VOLUME ---
+                    if (moveSound) moveSound.volume = 0.2; // 20% of original
+                    if (rotateSound) rotateSound.volume = 0.2; // 20% of original
+                    // Keep Game Over and Line Clear louder for impact
+                    if (gameOverSound) gameOverSound.volume = 0.7;
+                    if (lineClearSound) lineClearSound.volume = 0.7;
+
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
@@ -689,7 +701,7 @@
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
-            placementGrid.visible = false; 
+            placementGrid.visible = false; // Hide green mesh
             
             introScreen.style.display = 'flex';
             
@@ -714,7 +726,11 @@
             levelBox.style.display = 'block'; 
             updateScore(0);
             
+            // Ensure green mesh is hidden
+            placementGrid.visible = false;
+
             spawnPiece();
+            
             gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
@@ -808,7 +824,7 @@
             if (isValidMove(currentPiece, { x: direction })) {
                 currentPiece.userData.gridPos.x += direction;
                 updatePiecePosition(currentPiece);
-                triggerHaptic(20);
+                triggerHaptic(5); // Short haptic on move
                 playSound(moveSound);
             }
         }
@@ -885,7 +901,7 @@
                         }
                     }
                     updatePiecePosition(currentPiece);
-                    triggerHaptic(30);
+                    triggerHaptic(5); // Short haptic on rotate
                     playSound(rotateSound);
                     return; 
                 }
@@ -902,7 +918,7 @@
             spawnPiece();
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
-            triggerHaptic(50);
+            triggerHaptic(20); // Slightly longer haptic for hard drop
             playSound(moveSound); 
         }
 
@@ -1103,4 +1119,5 @@
         }
     </script></body>
 </html>
+
 

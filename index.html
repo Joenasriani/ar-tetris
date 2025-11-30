@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v40 - Audio Tweak & Hide Mesh)</title>
+    <title>AR Tetris 3D (v41 - Hide Mesh Fix)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -54,7 +54,7 @@
             border-radius: 15px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
-            font-size: 1.1rem; /* Reduced from 1.5rem */
+            font-size: 1.1rem; 
             font-weight: 500;
             z-index: 100;
             pointer-events: none; 
@@ -72,7 +72,7 @@
             top: 40%; 
             transform: translate(-50%, -50%);
             color: #FF4136;
-            font-size: 2.2rem; /* Reduced from 3rem */
+            font-size: 2.2rem; 
             font-weight: bold;
             display: none;
             text-shadow: 2px 2px 0px #000;
@@ -81,9 +81,9 @@
         #score-box {
             top: 20px;
             left: 20px;
-            transform: none; /* Left aligned */
+            transform: none; 
             color: #FFDC00;
-            font-size: 1.2rem; /* Reduced from 1.8rem */
+            font-size: 1.2rem; 
             font-weight: bold;
             text-shadow: 1px 1px 0px #000;
             display: none; 
@@ -95,7 +95,7 @@
             left: 20px;
             transform: none;
             color: #00FFFF; 
-            font-size: 1rem; /* Reduced from 1.2rem */
+            font-size: 1rem; 
             font-weight: bold;
             text-shadow: 1px 1px 0px #000;
             display: none; 
@@ -113,7 +113,7 @@
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1.2rem; /* Reduced */
+            font-size: 1.2rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
@@ -140,7 +140,7 @@
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1rem; /* Reduced */
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
@@ -168,7 +168,7 @@
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
             font-family: 'TetrisBlocks', sans-serif;
-            font-size: 1rem; /* Reduced */
+            font-size: 1rem; 
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
@@ -189,7 +189,7 @@
         #music-toggle {
             position: absolute;
             top: 20px;
-            right: 20px; /* Moved to top-right to balance score */
+            right: 20px; 
             width: 40px;
             height: 40px;
             background-color: rgba(0, 0, 0, 0.5);
@@ -296,11 +296,6 @@
     
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
-    
-    <!-- 
-      CRITICAL: Filenames match exactly what you requested.
-      Ensure your folders are lowercase: /music/
-    -->
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
@@ -666,6 +661,9 @@
                             }
                         }
                     }
+                } else {
+                    // --- FIX: Force hide mesh when PLAYING or GAME_OVER ---
+                    placementGrid.visible = false;
                 }
             }
             renderer.render(scene, camera);
@@ -701,7 +699,7 @@
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
-            placementGrid.visible = false; // Hide green mesh
+            placementGrid.visible = false; 
             
             introScreen.style.display = 'flex';
             

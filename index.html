@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v45 - Montserrat & Low Audio)</title>
+    <title>AR Tetris 3D (v48 - Montserrat Only & Low Audio)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -18,7 +18,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Use Montserrat, fallback to sans-serif */
+            /* 1. Use Montserrat for everything */
             font-family: 'Montserrat', sans-serif; 
             font-weight: 400; 
             background-color: #111;
@@ -44,17 +44,16 @@
             position: absolute;
             left: 50%;
             transform: translateX(-50%);
-            padding: 10px 20px;
+            padding: 8px 16px; /* Scaled down padding */
             background-color: rgba(0, 0, 0, 0.6);
-            border-radius: 15px;
+            border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             text-align: center;
-            font-size: 1rem; 
+            font-size: 1rem; /* Scaled down font */
             font-weight: 600;
             z-index: 100;
             pointer-events: none; 
             letter-spacing: 0.5px;
-            font-family: 'Montserrat', sans-serif; 
         }
 
         #message-box {
@@ -67,12 +66,11 @@
             top: 40%; 
             transform: translate(-50%, -50%);
             color: #FF4136;
-            font-size: 2rem; 
+            font-size: 1.8rem; /* Scaled down font */
             font-weight: 600;
             display: none;
             text-shadow: 2px 2px 0px #000;
             padding: 20px 40px;
-            font-family: 'Montserrat', sans-serif;
         }
 
         #score-box {
@@ -80,11 +78,10 @@
             left: 20px;
             transform: none; 
             color: #FFDC00;
-            font-size: 1.2rem; 
+            font-size: 1rem; /* Scaled down font */
             font-weight: 600;
             text-shadow: 1px 1px 0px #000;
             display: none; 
-            font-family: 'Montserrat', sans-serif;
         }
         
         #level-box {
@@ -92,11 +89,10 @@
             left: 20px;
             transform: none;
             color: #00FFFF; 
-            font-size: 1rem; 
+            font-size: 0.9rem; /* Scaled down font */
             font-weight: 600;
             text-shadow: 1px 1px 0px #000;
             display: none; 
-            font-family: 'Montserrat', sans-serif;
         }
 
         /* Custom AR Button */
@@ -105,12 +101,12 @@
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 14px 28px;
+            padding: 12px 24px;
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.1rem; 
+            font-family: 'Montserrat', sans-serif; /* Explicitly set font */
+            font-size: 1rem; /* Scaled down font */
             font-weight: 600;
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
@@ -136,8 +132,8 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1rem; 
+            font-family: 'Montserrat', sans-serif; /* Explicitly set font */
+            font-size: 0.9rem; /* Scaled down font */
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
@@ -164,8 +160,8 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1rem; 
+            font-family: 'Montserrat', sans-serif; /* Explicitly set font */
+            font-size: 0.9rem; /* Scaled down font */
             font-weight: 600;
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
@@ -187,8 +183,8 @@
             position: absolute;
             top: 20px;
             right: 20px; 
-            width: 40px; 
-            height: 40px;
+            width: 36px; 
+            height: 36px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 50%;
             border: 2px solid rgba(255, 255, 255, 0.3);
@@ -206,8 +202,8 @@
         }
 
         #music-toggle svg {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             fill: white;
         }
         
@@ -229,9 +225,9 @@
         }
         
         #intro-title {
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 800; /* Extra bold for title */
-            font-size: 2.5rem; 
+            font-family: 'Montserrat', sans-serif; /* Explicitly set font */
+            font-weight: 800; 
+            font-size: 2.5rem; /* Scaled down font */
             color: #FF00FF; 
             text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000;
             margin-bottom: 10px;
@@ -240,9 +236,9 @@
         }
         
         #intro-subtitle {
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Montserrat', sans-serif; /* Explicitly set font */
             font-weight: 400;
-            font-size: 1rem; 
+            font-size: 1rem; /* Scaled down font */
             color: #00FFFF; 
             text-shadow: 0 0 5px #00FFFF;
             letter-spacing: 4px;
@@ -294,11 +290,6 @@
     
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
-    
-    <!-- 
-      CRITICAL: Filenames match exactly what you requested.
-      Ensure your folders are lowercase: /music/
-    -->
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
@@ -341,7 +332,6 @@
         let gameState = GAME_STATE.INITIALIZING;
         let score = 0;
         
-        // --- Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
         let currentDropSpeed = 1000; 
@@ -371,6 +361,7 @@
         let isMusicMuted = false; 
         let blueGridMat, greenGridMat;
 
+        // 3. Haptics are on
         function triggerHaptic(duration = 20) {
             if (navigator.vibrate) navigator.vibrate(duration);
         }
@@ -468,15 +459,13 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // --- LOWERED VOLUME ---
-                    if (bgmLoop) bgmLoop.volume = 0.12; // Very low for background
+                    // 4. Music and sfx are very low in volume (0.05 and 0.15)
+                    if (bgmLoop) bgmLoop.volume = 0.05; 
                     
-                    // --- LOWERED SFX VOLUME ---
-                    if (moveSound) moveSound.volume = 0.2; // Very low
-                    if (rotateSound) rotateSound.volume = 0.2; // Very low
-                    // Keep Game Over and Line Clear slightly louder but still low
-                    if (gameOverSound) gameOverSound.volume = 0.3;
-                    if (lineClearSound) lineClearSound.volume = 0.3;
+                    if (moveSound) moveSound.volume = 0.15; 
+                    if (rotateSound) rotateSound.volume = 0.15; 
+                    if (gameOverSound) gameOverSound.volume = 0.3; // Keep these slightly audible
+                    if (lineClearSound) lineClearSound.volume = 0.3; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -698,8 +687,8 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
-            // --- NEW: Treat floor as a bit lower than detected (-0.08m) ---
-            gameBoard.translateY(baseLift - 0.08); 
+            // 2. Always treat the floor in the game a bit lower than where it is (-0.15m)
+            gameBoard.translateY(baseLift - 0.15); 
             gameBoard.translateZ(depthOffset);
             
             scene.add(gameBoard);
@@ -728,7 +717,6 @@
             levelBox.style.display = 'block'; 
             updateScore(0);
             
-            // Ensure green mesh is hidden
             placementGrid.visible = false;
 
             spawnPiece();
@@ -921,7 +909,7 @@
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
-            // playSound(moveSound); // Sound disabled on hard drop as well
+            // playSound(moveSound); // Sound disabled on hard drop too
         }
 
         function isValidMove(piece, delta) {
@@ -1121,3 +1109,5 @@
         }
     </script></body>
 </html>
+
+

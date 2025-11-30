@@ -2,13 +2,13 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v36 - Music Toggle)</title>
+    <title>AR Tetris 3D (v37 - Montserrat Medium Font)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
-    <!-- Load Google Font: Roboto (Thin weight) -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500&display=swap" rel="stylesheet">
+    <!-- Load Google Font: Montserrat (Medium weight) -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet">
 
     <style>
         /* --- Load Custom Font --- */
@@ -24,8 +24,9 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: 'Roboto', sans-serif; 
-            font-weight: 300; 
+            /* Use Montserrat Medium, fallback to sans-serif */
+            font-family: 'Montserrat', sans-serif; 
+            font-weight: 500; /* Medium weight */
             background-color: #111;
             color: white;
             touch-action: none; 
@@ -59,7 +60,8 @@
             z-index: 100;
             pointer-events: none; 
             letter-spacing: 1px;
-            font-family: 'TetrisBlocks', sans-serif; 
+            /* Ensure font is Montserrat Medium */
+            font-family: 'Montserrat', sans-serif; 
         }
 
         #message-box {
@@ -73,7 +75,7 @@
             transform: translate(-50%, -50%);
             color: #FF4136;
             font-size: 3rem; 
-            font-weight: bold;
+            font-weight: 500; /* Medium weight */
             display: none;
             text-shadow: 2px 2px 0px #000;
         }
@@ -84,7 +86,7 @@
             transform: translateX(-50%); /* Center align */
             color: #FFDC00;
             font-size: 1.8rem;
-            font-weight: bold;
+            font-weight: 500; /* Medium weight */
             text-shadow: 2px 2px 0px #000;
             display: none; /* Hidden initially */
         }
@@ -95,10 +97,10 @@
             transform: translateX(-50%); /* Center align */
             color: #00FFFF; 
             font-size: 1.2rem;
-            font-weight: bold;
+            font-weight: 500; /* Medium weight */
             text-shadow: 1px 1px 0px #000;
             display: none; 
-            font-family: 'TetrisBlocks', sans-serif;
+            font-family: 'Montserrat', sans-serif;
         }
 
         /* Custom AR Button */
@@ -111,9 +113,9 @@
             border-radius: 50px;
             background: linear-gradient(145deg, #8a2be2, #4169e1);
             color: white;
-            font-family: 'TetrisBlocks', sans-serif;
+            font-family: 'Montserrat', sans-serif;
             font-size: 1.5rem;
-            font-weight: 600;
+            font-weight: 500; /* Medium weight */
             border: none;
             box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
             cursor: pointer;
@@ -138,9 +140,9 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #1e90ff, #00bfff);
             color: white;
-            font-family: 'TetrisBlocks', sans-serif;
+            font-family: 'Montserrat', sans-serif;
             font-size: 1.2rem;
-            font-weight: 600;
+            font-weight: 500; /* Medium weight */
             border: none;
             box-shadow: 0 4px 15px rgba(30, 144, 255, 0.5);
             cursor: pointer;
@@ -166,9 +168,9 @@
             border-radius: 20px;
             background: linear-gradient(145deg, #2ecc71, #27ae60); 
             color: white;
-            font-family: 'TetrisBlocks', sans-serif;
+            font-family: 'Montserrat', sans-serif;
             font-size: 1.2rem;
-            font-weight: 600;
+            font-weight: 500; /* Medium weight */
             border: none;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
             cursor: pointer;

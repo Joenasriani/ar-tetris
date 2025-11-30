@@ -2,13 +2,13 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v51 - Final Polish)</title>
+    <title>AR Tetris 3D (v52 - Record Label)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
     <!-- Load Google Font: Montserrat (Medium & Bold) -->
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
 
     <style>
         /* --- Load Custom Font --- */
@@ -45,7 +45,7 @@
         /* UI Elements */
         .ui-element {
             position: absolute;
-            left: 20px; /* Fixed left alignment */
+            left: 20px; 
             padding: 8px 16px; 
             background-color: rgba(0, 0, 0, 0.6);
             border-radius: 12px;
@@ -59,7 +59,6 @@
             font-family: 'Montserrat', sans-serif; 
         }
 
-        /* Center the message box specifically */
         #message-box {
             left: 50%;
             transform: translateX(-50%);
@@ -81,28 +80,24 @@
             font-family: 'Montserrat', sans-serif;
         }
 
-        /* Top Left Stack - No Overlap */
         #score-box {
             top: 20px;
-            /* left: 20px set by .ui-element */
             transform: none; 
             color: #FFDC00;
             display: none; 
         }
         
         #level-box {
-            top: 70px; /* Below Score */
-            /* left: 20px set by .ui-element */
+            top: 70px; 
             transform: none;
             color: #00FFFF; 
             font-size: 0.9rem; 
             display: none; 
         }
 
-        /* Recording Indicator (Red Dot) - Below Level Box */
         #recording-indicator {
             position: absolute;
-            top: 120px; /* Below Level */
+            top: 120px; 
             left: 25px; 
             width: 15px;
             height: 15px;
@@ -165,7 +160,12 @@
             text-transform: uppercase;
         }
 
-        /* Music Toggle Button (Top Right) */
+        #replay-button:hover {
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.7);
+        }
+
+        /* Music Toggle Button */
         #music-toggle {
             position: absolute;
             top: 20px;
@@ -184,13 +184,17 @@
             transition: background-color 0.2s;
         }
 
+        #music-toggle:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
         #music-toggle svg {
             width: 18px;
             height: 18px;
             fill: white;
         }
 
-        /* Recording Button (Below Music Toggle) */
+        /* Recording Button */
         #record-button {
             position: absolute;
             top: 70px; 
@@ -228,6 +232,21 @@
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
+        }
+        
+        /* --- NEW: Record Label --- */
+        #record-label {
+            position: absolute;
+            top: 80px; /* Align with record button */
+            right: 65px; /* Left of the button */
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.6rem; /* Very small font */
+            font-weight: 300;
+            text-transform: uppercase;
+            display: none; /* Hidden initially */
+            pointer-events: none;
+            text-align: right;
+            text-shadow: 0 0 2px black;
         }
         
         /* Intro Screen Styles */
@@ -280,10 +299,9 @@
     <!-- UI -->
     <div id="message-box" class="ui-element">Scan floor to start</div>
     <div id="game-over-box" class="ui-element">GAME OVER</div>
+    
     <div id="score-box" class="ui-element">Score: 0</div>
     <div id="level-box" class="ui-element">Level: 1</div>
-    
-    <!-- Recording Indicator -->
     <div id="recording-indicator"></div>
 
     <!-- Intro Screen -->
@@ -311,6 +329,8 @@
             <rect x="6" y="6" width="12" height="12" />
         </svg>
     </button>
+    <!-- NEW: Label -->
+    <div id="record-label">click to record</div>
 
     <button id="custom-ar-button">
         Launch AR
@@ -327,7 +347,7 @@
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
-    <!-- TOOT Sound (Base64 for reliability) -->
+    <!-- TOOT Sound -->
     <audio id="audio-toot" src="data:audio/wav;base64,UklGRl9vT1ZYXxcqU1qa..." preload="auto" playsinline></audio>
 
     <!-- Three.js -->
@@ -354,7 +374,7 @@
         
         let customArButton, messageBox, scoreBox, levelBox, gameOverBox, replayButton, musicToggleBtn;
         let iconSoundOn, iconSoundOff;
-        let recordButton, iconRecord, iconStop, recordingIndicator;
+        let recordButton, iconRecord, iconStop, recordingIndicator, recordLabel;
         let mediaRecorder;
         let recordedChunks = [];
         let isRecording = false;
@@ -414,7 +434,7 @@
             osc.type = 'sine';
             osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
             osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1); 
-            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Low volume for toot
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); 
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
             osc.start();
             osc.stop(audioCtx.currentTime + 0.1);
@@ -456,6 +476,7 @@
             iconRecord = document.getElementById('icon-record');
             iconStop = document.getElementById('icon-stop');
             recordingIndicator = document.getElementById('recording-indicator');
+            recordLabel = document.getElementById('record-label'); // Get label
 
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
@@ -519,15 +540,11 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // 5. Lower volume of outro to 80% (0.2), line clear to 80% (0.2)
-                    // Actually "lower BY 80%" means 20% remains. "Lower TO 80%" means 80% remains.
-                    // Request: "Low the volume of line clear sound by 80%" -> 20% volume (0.2)
-                    // Request: "Lower the volume of the outro by 80%" -> 20% volume (0.2)
                     if (bgmLoop) bgmLoop.volume = 0.05; 
-                    if (moveSound) moveSound.volume = 0.2; 
-                    if (rotateSound) rotateSound.volume = 0.2; 
-                    if (gameOverSound) gameOverSound.volume = 0.1; // Low
-                    if (lineClearSound) lineClearSound.volume = 0.1; // Low
+                    if (moveSound) moveSound.volume = 0.15; 
+                    if (rotateSound) rotateSound.volume = 0.15; 
+                    if (gameOverSound) gameOverSound.volume = 0.1; 
+                    if (lineClearSound) lineClearSound.volume = 0.1; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -535,6 +552,7 @@
                     
                     customArButton.style.display = 'none';
                     recordButton.style.display = 'flex';
+                    recordLabel.style.display = 'block'; // Show label
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Scan floor to start");
 
@@ -553,6 +571,7 @@
                 if (bgmLoop) bgmLoop.pause();
                 if (isRecording) stopRecording();
                 recordButton.style.display = 'none';
+                recordLabel.style.display = 'none'; // Hide label
                 window.location.reload();
             });
 
@@ -662,10 +681,14 @@
             mediaRecorder.onstop = saveAndShareVideo;
             mediaRecorder.start();
             isRecording = true;
+            
+            // UI Update
             recordButton.classList.add('recording');
             iconRecord.style.display = 'none';
             iconStop.style.display = 'block';
             recordingIndicator.style.display = 'block'; 
+            recordLabel.style.display = 'none'; // Hide label when recording starts
+
             updateMessage("Recording Started...");
             setTimeout(() => { if(gameState === GAME_STATE.PLAYING) updateMessage("", true) }, 1500);
         }
@@ -674,10 +697,14 @@
             if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
                 isRecording = false;
+                
+                // UI Update
                 recordButton.classList.remove('recording');
                 iconRecord.style.display = 'block';
                 iconStop.style.display = 'none';
                 recordingIndicator.style.display = 'none'; 
+                recordLabel.style.display = 'block'; // Show label again
+                
                 updateMessage("Processing video...");
             }
         }
@@ -713,6 +740,7 @@
 
         function toggleMusic() {
             if (!bgmLoop) return;
+
             if (isMusicMuted) {
                 bgmLoop.play().catch(e => console.error("BGM play failed:", e));
                 iconSoundOn.style.display = 'block';
@@ -743,13 +771,16 @@
                 if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
                     if (hitTestSource) {
                         const hitTestResults = frame.getHitTestResults(hitTestSource); 
+
                         if (hitTestResults.length > 0) {
                             const hit = hitTestResults[0];
                             const referenceSpace = renderer.xr.getReferenceSpace();
                             const pose = hit.getPose(referenceSpace);
+                            
                             placementGrid.matrix.fromArray(pose.transform.matrix);
                             placementGrid.matrixAutoUpdate = false; 
                             placementGrid.visible = true; 
+
                             const normalY = pose.transform.matrix[5]; 
                             const isFloor = normalY > 0.85;
 
@@ -822,10 +853,12 @@
 
             setTimeout(() => {
                 introScreen.style.opacity = '0';
+                
                 setTimeout(() => {
                     introScreen.style.display = 'none';
                     startGame();
                 }, 500); 
+                
             }, 2500); 
         }
 
@@ -834,8 +867,11 @@
             scoreBox.style.display = 'block';
             levelBox.style.display = 'block'; 
             updateScore(0);
+            
             placementGrid.visible = false;
+
             spawnPiece();
+            
             gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
@@ -855,58 +891,67 @@
             gameState = GAME_STATE.GAME_OVER;
             gameOverBox.style.display = 'block';
             replayButton.style.display = 'block'; 
+            
             if (bgmLoop) bgmLoop.pause();
             playSound(gameOverSound);
         }
 
-        // 7. Reset game: Go back to scanning
         function resetGame() {
             gameOverBox.style.display = 'none';
             replayButton.style.display = 'none';
             
-            // Clear current board
             for (let i = gameBoard.children.length - 1; i >= 0; i--) {
-                gameBoard.remove(gameBoard.children[i]);
+                const child = gameBoard.children[i];
+                gameBoard.remove(child);
             }
-            scene.remove(gameBoard); // Remove the whole board from scene
-            gameBoard = new THREE.Group(); // Create fresh group
-
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             score = 0;
+            
             linesClearedTotal = 0;
             level = 1;
             currentDropSpeed = 1000;
-            
-            // Hide Game UI
-            scoreBox.style.display = 'none';
-            levelBox.style.display = 'none';
+            updateScore(0); 
+            levelBox.textContent = `Level: ${level}`;
 
-            // Reset Music
             if (bgmLoop && !isMusicMuted) {
                 bgmLoop.currentTime = 0;
                 bgmLoop.play().catch(e => console.error("BGM restart failed:", e));
             }
 
-            // Go to Scanning
-            gameState = GAME_STATE.SCANNING;
-            placementGrid.visible = false; // Will reappear when hit test works
-            updateMessage("Scan floor to start");
+            gameState = GAME_STATE.PLAYING;
+            spawnPiece();
+            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
         function updateScore(linesCleared) {
             if (linesCleared > 0) {
                 const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
                 score += points[linesCleared] || 0;
+                
                 linesClearedTotal += linesCleared;
                 const newLevel = Math.floor(linesClearedTotal / 5) + 1; 
+                
                 if (newLevel > level) {
                     level = newLevel;
                     levelBox.textContent = `Level: ${level}`;
                     currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
+                    
                     clearInterval(gameLoopInterval);
                     gameLoopInterval = setInterval(gameTick, currentDropSpeed);
                 }
+
                 playSound(lineClearSound);
+                const flash = document.createElement('div');
+                flash.style.position = 'absolute';
+                flash.style.top = '0';
+                flash.style.left = '0';
+                flash.style.width = '100%';
+                flash.style.height = '100%';
+                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                flash.style.zIndex = '999';
+                flash.style.pointerEvents = 'none'; 
+                document.body.appendChild(flash);
+                setTimeout(() => document.body.removeChild(flash), 100);
             }
             scoreBox.textContent = `Score: ${score}`;
         }
@@ -922,55 +967,57 @@
             }
             
             if (linesCleared > 0) {
-                // 4. Slow animation for clearing (Pause game)
                 clearInterval(gameLoopInterval);
 
-                // Visual feedback on blocks
+                const blocksToAnimate = [];
                 gameBoard.children.forEach(block => {
                     const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
                     if (rowsToClear.includes(blockY)) {
-                        // Animate scale down
-                        let scale = 1;
-                        const fadeInterval = setInterval(() => {
-                            scale -= 0.1;
-                            if (scale <= 0) {
-                                clearInterval(fadeInterval);
-                                block.visible = false;
-                            } else {
-                                block.scale.setScalar(scale);
-                            }
-                        }, 50); // 50ms * 10 steps = 500ms animation
+                        blocksToAnimate.push(block);
                     }
                 });
 
-                // Wait 1 second then process physical clear
-                setTimeout(() => {
-                    // Process removal
-                    gameBoard.children = gameBoard.children.filter(block => {
-                        if (block === currentPiece) return true; 
-                        const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                        return !rowsToClear.includes(blockY); 
-                    });
-                    for (const y of rowsToClear.sort((a, b) => a - b)) { 
-                        grid.splice(y, 1);
-                        grid.unshift(Array(BOARD_WIDTH).fill(0));
-                    }
-                    gameBoard.children.forEach(block => {
-                        if (block === currentPiece) return; 
-                        const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                        let shift = 0;
-                        for (const clearedY of rowsToClear) {
-                            if (blockY < clearedY) shift++;
-                        }
-                        if (shift > 0) block.position.y -= shift * BLOCK_SIZE;
-                    });
-                    
-                    updateScore(linesCleared);
-                    
-                    // Resume game
-                    gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                let progress = 0;
+                const duration = 1000; 
+                const startTime = Date.now();
 
-                }, 1000); // 1 second delay
+                function animateClear() {
+                    const now = Date.now();
+                    progress = (now - startTime) / duration;
+
+                    if (progress < 1) {
+                        blocksToAnimate.forEach(b => {
+                            b.scale.setScalar(1 - progress);
+                            b.rotation.y += 0.2; 
+                            b.rotation.z += 0.1;
+                        });
+                        requestAnimationFrame(animateClear);
+                    } else {
+                        gameBoard.children = gameBoard.children.filter(block => {
+                            if (block === currentPiece) return true; 
+                            const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                            return !rowsToClear.includes(blockY); 
+                        });
+                        for (const y of rowsToClear.sort((a, b) => a - b)) { 
+                            grid.splice(y, 1);
+                            grid.unshift(Array(BOARD_WIDTH).fill(0));
+                        }
+                        gameBoard.children.forEach(block => {
+                            if (block === currentPiece) return; 
+                            const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                            let shift = 0;
+                            for (const clearedY of rowsToClear) {
+                                if (blockY < clearedY) shift++;
+                            }
+                            if (shift > 0) block.position.y -= shift * BLOCK_SIZE;
+                        });
+                        
+                        updateScore(linesCleared);
+                        
+                        gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                    }
+                }
+                animateClear();
             }
         }
 
@@ -980,7 +1027,6 @@
                 currentPiece.userData.gridPos.x += direction;
                 updatePiecePosition(currentPiece);
                 triggerHaptic(5); 
-                // No sound on move
             }
         }
         

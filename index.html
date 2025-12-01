@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v60 - Very Low Audio)</title>
+    <title>AR Tetris 3D (v61 - Recorder Button Color Fix)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -170,12 +170,12 @@
         #record-button {
             top: 74px; /* Below music toggle */
             right: 20px;
-            /* Default: Grey/White Translucent */
+            /* --- CHANGED: Default is Grey/White Translucent --- */
             background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.5);
         }
         
-        /* Active Recording: Red */
+        /* --- CHANGED: Active Recording is Red --- */
         #record-button.recording {
             background: rgba(255, 0, 0, 0.9); 
             border-color: #FF4136;
@@ -648,12 +648,16 @@
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
-                    // Volume Settings (VERY LOW)
-                    if (bgmLoop) bgmLoop.volume = 0.02; // Adjusted to be very subtle
+                    // Volume Settings
+                    if (bgmLoop) bgmLoop.volume = 0.02; // Very Low for background
                     if (moveSound) moveSound.volume = 0.08; 
                     if (rotateSound) rotateSound.volume = 0.08; 
-                    if (gameOverSound) gameOverSound.volume = 0.08; 
+                    
+                    // 3. Low volume for line clear
                     if (lineClearSound) lineClearSound.volume = 0.08; 
+                    
+                    // 5. Low volume for outro
+                    if (gameOverSound) gameOverSound.volume = 0.08; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -897,27 +901,27 @@
                             if (isFloor) {
                                 if (gameState === GAME_STATE.SCANNING) {
                                     gameState = GAME_STATE.PLACING;
-                                    updateMessage("Tap to lock");
+                                    updateMessage("Tap to lock", false);
                                     placementGrid.material = greenGridMat; 
                                     triggerHaptic(50); 
                                 }
                             } else {
                                 if (gameState === GAME_STATE.PLACING) {
                                     gameState = GAME_STATE.SCANNING;
-                                    updateMessage("Scan floor to start");
+                                    updateMessage("Scan floor to start", true);
+                                    placementGrid.material = blueGridMat; 
                                 }
-                                placementGrid.material = blueGridMat; 
                             }
                         } else {
                             placementGrid.visible = false; 
                             if (gameState === GAME_STATE.PLACING) {
                                 gameState = GAME_STATE.SCANNING;
-                                updateMessage("Scan floor to start");
+                                updateMessage("Scan floor to start", true);
                             }
                         }
                     }
                 } else {
-                    // --- FIX: Force hide mesh when PLAYING or GAME_OVER ---
+                    // Force hide mesh when PLAYING or GAME_OVER
                     placementGrid.visible = false;
                 }
             }
@@ -930,12 +934,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function updateMessage(message, autoHide = false) {
-            messageBox.textContent = message;
-            messageBox.style.display = 'block';
-            if (autoHide) {
-                setTimeout(() => { messageBox.style.display = 'none'; }, 2000);
-            }
+        function updateMessage(message, showIcon = false) {
+            messageText.textContent = message;
+            messageBox.style.display = message ? 'flex' : 'none';
+            phoneIcon.style.display = showIcon ? 'block' : 'none';
         }
 
         function playIntroAndStart() {
@@ -950,7 +952,7 @@
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
             
-            // --- NEW: Treat floor as a bit lower than detected (-0.15m) ---
+            // Treat floor as a bit lower (-0.15m)
             gameBoard.translateY(baseLift - 0.15); 
             gameBoard.translateZ(depthOffset);
             
@@ -1000,8 +1002,10 @@
         function gameOver() {
             clearInterval(gameLoopInterval);
             gameState = GAME_STATE.GAME_OVER;
-            gameOverBox.style.display = 'block';
-            replayButton.style.display = 'block'; 
+            
+            goScore.textContent = score;
+            goLevel.textContent = level;
+            gameOverCard.style.display = 'flex';
             
             if (bgmLoop) bgmLoop.pause();
             playSound(gameOverSound);
@@ -1056,8 +1060,18 @@
                 }
 
                 playSound(lineClearSound);
+                const flash = document.createElement('div');
+                flash.style.position = 'absolute';
+                flash.style.top = '0';
+                flash.style.left = '0';
+                flash.style.width = '100%';
+                flash.style.height = '100%';
+                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                flash.style.zIndex = '999';
+                flash.style.pointerEvents = 'none'; 
+                document.body.appendChild(flash);
+                setTimeout(() => document.body.removeChild(flash), 100);
             }
-            // Update HUD
             scoreVal.textContent = score;
             levelVal.textContent = level;
         }
@@ -1235,7 +1249,6 @@
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
-            // playSound(moveSound); // Sound disabled on hard drop too
         }
 
         function isValidMove(piece, delta) {

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>AR/VR Tetris 3D (Immersive Edition)</title>
+    <title>AR/VR Tetris 3D (v70 - Universal Launch)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <!-- Required for AR/VR -->
@@ -20,9 +20,6 @@
         }
         canvas { display: block; width: 100%; height: 100%; outline: none; }
         
-        /* Hide default AR button to use our custom one */
-        #default-ar-button { display: none !important; }
-
         /* --- UI ELEMENTS --- */
         .glass-panel {
             background: rgba(20, 20, 20, 0.85); 
@@ -88,6 +85,11 @@
             border: none; box-shadow: 0 8px 20px rgba(138, 43, 226, 0.4);
             cursor: pointer; z-index: 101; letter-spacing: 1px; text-transform: uppercase;
             animation: btn-pulse 2s infinite;
+            display: block; /* Always block, controlled by opacity */
+            transition: opacity 0.3s, transform 0.1s;
+        }
+        #custom-ar-button.disabled {
+            background: #444; color: #888; box-shadow: none; animation: none; cursor: not-allowed;
         }
         @keyframes btn-pulse { 0% { box-shadow: 0 0 0 0 rgba(138,43,226,0.7); } 70% { box-shadow: 0 0 0 15px transparent; } }
 
@@ -151,12 +153,13 @@
     <!-- BUTTONS -->
     <button id="music-toggle" class="control-btn"><span class="material-icons-round" id="icon-music">volume_up</span></button>
     <button id="record-button" class="control-btn"><span class="material-icons-round" id="icon-rec">fiber_manual_record</span></button>
-    <button id="custom-ar-button">ENTER IMMERSIVE</button>
+    
+    <button id="custom-ar-button" class="disabled">CHECKING...</button>
     
     <div id="intro-credits">
         Developed by JN with Vibe Coding AI<br>
         Controls: Arrows (PC) / Touch (Mobile) / Hands (VR)<br>
-        v68 - AR/VR Edition
+        v70 - Universal Launch
     </div>
 
     <!-- THREE.JS IMPORTS -->
@@ -171,7 +174,6 @@
 
     <script type="module">
         import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
         // --- GLOBAL VARIABLES ---
@@ -179,7 +181,8 @@
         let controller1, controller2, controllerGrip1, controllerGrip2;
         let raycaster;
         let hitTestSource = null;
-        let localSpace = null;
+        let xrSession = null;
+        let currentSessionMode = null;
         
         // Game Objects
         let placementGrid, gameBoard, currentPiece;
@@ -197,7 +200,7 @@
         let grabController = null;
         
         // Constants
-        const BOARD_W = 10, BOARD_H = 20, BLOCK_SIZE = 0.08; // 8cm blocks
+        const BOARD_W = 10, BOARD_H = 20, BLOCK_SIZE = 0.08; 
         const COLORS = [0x00F0F0, 0xF0F000, 0xA000F0, 0x00F000, 0xF00000, 0x0000F0, 0xF0A000];
         const SHAPES = [
             [[[1,1,1,1]], [[1],[1],[1],[1]]], // I
@@ -210,8 +213,6 @@
         ];
         
         let grid = Array(BOARD_H).fill().map(()=>Array(BOARD_W).fill(0));
-
-        // Audio Context
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
         // UI DOM
@@ -229,19 +230,18 @@
             recTime: document.getElementById('rec-time')
         };
 
-        // Recorder
         let mediaRecorder, recordedChunks = [], recTimerInt;
         let isRecording = false;
 
         init();
         setupAudio();
+        // Check both AR and VR support
+        checkXRSupport();
 
         function init() {
-            // Scene Setup
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
             
-            // Lighting
             const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 2); 
             hemi.position.set(0, 2, 0);
             scene.add(hemi);
@@ -249,46 +249,32 @@
             dir.position.set(0, 5, 2);
             scene.add(dir);
 
-            // Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // AR Button
-            const arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['hit-test'],
-                optionalFeatures: ['dom-overlay', 'local-floor', 'hand-tracking'],
-                domOverlay: { root: document.body }
-            });
-            arButton.id = "default-ar-button"; 
-            document.body.appendChild(arButton);
-
-            // --- CONTROLLERS & INTERACTION ---
+            // --- CONTROLLERS ---
             raycaster = new THREE.Raycaster();
             
-            // Controller 1
             controller1 = renderer.xr.getController(0);
             controller1.addEventListener('selectstart', onSelectStart);
             controller1.addEventListener('selectend', onSelectEnd);
             scene.add(controller1);
             
-            // Controller 2
             controller2 = renderer.xr.getController(1);
             controller2.addEventListener('selectstart', onSelectStart);
             controller2.addEventListener('selectend', onSelectEnd);
             scene.add(controller2);
 
-            // Visual Lines for Controllers
+            // Controller Rays
             const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-5)]);
             const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
-            const line1 = new THREE.Line(lineGeo, lineMat); line1.name = 'line'; line1.scale.z = 1;
-            const line2 = line1.clone();
-            controller1.add(line1);
-            controller2.add(line2);
+            controller1.add(new THREE.Line(lineGeo, lineMat));
+            controller2.add(new THREE.Line(lineGeo.clone(), lineMat));
 
-            // Controller Models (Optional visual hands)
+            // Visual Hands
             const controllerModelFactory = new XRControllerModelFactory();
             controllerGrip1 = renderer.xr.getControllerGrip(0);
             controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
@@ -308,70 +294,147 @@
             gameBoard = new THREE.Group();
             scene.add(gameBoard); 
 
-            // Visual Ghost for VR Placement
+            // Ghost Piece
             const ghostGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
             const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, wireframe: true });
             ghostPiece = new THREE.Group();
-            // Just one generic box to show target location
             ghostPiece.add(new THREE.Mesh(ghostGeo, ghostMat));
             ghostPiece.visible = false;
             gameBoard.add(ghostPiece);
 
-            // Event Listeners
-            ui.arBtn.addEventListener('click', () => {
-                unlockAudio();
-                arButton.click();
-            });
-
-            // Desktop Controls
+            // Listeners
             window.addEventListener('keydown', handleKey);
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-            
-            // Touch Controls
+            window.addEventListener('resize', onWindowResize);
             setupTouch();
             
-            // UI bindings
             document.getElementById('replay-button').addEventListener('click', resetGame);
             ui.recBtn.addEventListener('click', toggleRecord);
 
             renderer.setAnimationLoop(render);
         }
 
+        // --- UNIVERSAL LAUNCH LOGIC ---
+
+        function checkXRSupport() {
+            if ('xr' in navigator) {
+                // Check AR (Preferred for Phones)
+                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                    if (supported) {
+                        enableButton('immersive-ar', 'ENTER AR');
+                    } else {
+                        // Check VR (Preferred for Headsets)
+                        navigator.xr.isSessionSupported('immersive-vr').then((vrSupported) => {
+                            if (vrSupported) {
+                                enableButton('immersive-vr', 'ENTER VR');
+                            } else {
+                                disableButton("DEVICE NOT SUPPORTED");
+                            }
+                        });
+                    }
+                }).catch(e => {
+                     // Often happens on non-secure contexts (http vs https)
+                     console.error(e);
+                     disableButton("WEBXR ERROR (HTTPS?)");
+                });
+            } else {
+                disableButton("WEBXR NOT FOUND");
+            }
+        }
+
+        function enableButton(mode, text) {
+            ui.arBtn.classList.remove('disabled');
+            ui.arBtn.innerText = text;
+            currentSessionMode = mode;
+            ui.arBtn.addEventListener('click', onButtonClick);
+        }
+
+        function disableButton(text) {
+             ui.arBtn.classList.add('disabled');
+             ui.arBtn.innerText = text;
+             // Allow click to explain why
+             ui.arBtn.addEventListener('click', () => {
+                 alert("Your browser/device does not support WebXR Immersive Mode. \n\nEnsure you are using:\n- Chrome on Android (for AR)\n- Meta Quest Browser (for VR)\n- HTTPS Connection");
+             });
+        }
+
+        async function onButtonClick() {
+            if(!currentSessionMode) return;
+            unlockAudio();
+            
+            if (xrSession) {
+                xrSession.end();
+                return;
+            }
+
+            try {
+                // VR needs different reference space types usually, but 'local-floor' works for both often
+                const sessionOptions = {
+                    requiredFeatures: ['hit-test'], // Required for AR
+                    optionalFeatures: ['dom-overlay', 'local-floor', 'bounded-floor', 'hand-tracking'],
+                    domOverlay: { root: document.body }
+                };
+
+                // Remove hit-test requirement for VR mode (some VR headsets don't support AR hit-test)
+                if (currentSessionMode === 'immersive-vr') {
+                    sessionOptions.requiredFeatures = ['local-floor'];
+                    delete sessionOptions.optionalFeatures; // simplify for VR
+                }
+
+                const session = await navigator.xr.requestSession(currentSessionMode, sessionOptions);
+                session.addEventListener('end', onSessionEnded);
+                
+                await renderer.xr.setSession(session);
+                xrSession = session;
+                
+                ui.arBtn.innerText = "EXIT IMMERSIVE";
+                
+                // If VR, we skip scanning and go straight to placement/play
+                if (currentSessionMode === 'immersive-vr') {
+                    // Place board in front of user
+                    gameBoard.position.set(0, 0, -1); // 1 meter in front
+                    placementGrid.visible = false;
+                    startGame(); 
+                } else {
+                    gameState = 1; // AR Scanning
+                    ui.msgText.innerText = "Scan floor...";
+                }
+                
+            } catch (e) {
+                alert("Launch Failed: " + e.message);
+            }
+        }
+
+        function onSessionEnded() {
+            xrSession = null;
+            ui.arBtn.innerText = "ENTER IMMERSIVE";
+            window.location.reload(); 
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
         // --- INTERACTION LOGIC ---
 
         function onSelectStart(event) {
-            // 1. Placing Mode
             if (gameState === 2) { 
                 startGame(); 
                 return; 
             }
-            
-            // 2. Gameplay Grabbing
             if (gameState === 3 && currentPiece) {
                 const controller = event.target;
-                
-                // Check distance
                 const piecePos = new THREE.Vector3();
                 currentPiece.getWorldPosition(piecePos);
-                const ctrlPos = controller.position;
-                
-                // 35cm grab radius - larger for VR ease of use
-                if (ctrlPos.distanceTo(piecePos) < 0.35) {
+                // 35cm radius
+                if (controller.position.distanceTo(piecePos) < 0.35) {
                     isGrabbing = true;
                     grabController = controller;
                     grabbedObject = currentPiece;
-                    
-                    // Pause Gravity
                     clearInterval(gameLoopInterval);
-                    
-                    // Attach to controller to move it
                     controller.attach(grabbedObject); 
-                    
-                    playSynthSound(440, 'triangle', 0.1); // Feedback beep
+                    playSynthSound(440, 'triangle', 0.1);
                     triggerHaptic(event.target, 0.5, 20);
                 }
             }
@@ -379,42 +442,31 @@
 
         function onSelectEnd(event) {
             if (isGrabbing && grabController === event.target) {
-                // Detach from hand, attach back to board
                 gameBoard.attach(grabbedObject);
-                
-                // Calculate Grid Position based on where we dropped it
                 const lx = grabbedObject.position.x;
                 const ly = grabbedObject.position.y;
-                
-                // Convert to Grid Indices
                 let gx = Math.round(lx / BLOCK_SIZE + (BOARD_W / 2) - 0.5);
                 let gy = Math.round((BOARD_H / 2 - 0.5) - (ly / BLOCK_SIZE));
 
-                // Constrain
-                if (gx < 0) gx = 0; 
-                if (gx >= BOARD_W) gx = BOARD_W - 1;
+                if (gx < 0) gx = 0; if (gx >= BOARD_W) gx = BOARD_W - 1;
                 
-                const userData = currentPiece.userData;
-                const oldX = userData.gridPos.x;
-                const oldY = userData.gridPos.y;
+                const ud = currentPiece.userData;
+                const oldX = ud.gridPos.x;
+                const oldY = ud.gridPos.y;
                 
-                // Validate
                 if (isValidMove(currentPiece, { pos: {x: gx, y: gy} })) {
-                    userData.gridPos.x = gx;
-                    userData.gridPos.y = gy;
-                    playSynthSound(880, 'sine', 0.1); // Success
+                    ud.gridPos.x = gx;
+                    ud.gridPos.y = gy;
+                    playSynthSound(880, 'sine', 0.1); 
                 } else {
-                    // Invalid (inside block), revert
-                    userData.gridPos.x = oldX;
-                    userData.gridPos.y = oldY;
-                    playSynthSound(150, 'sawtooth', 0.2); // Error
+                    ud.gridPos.x = oldX;
+                    ud.gridPos.y = oldY;
+                    playSynthSound(150, 'sawtooth', 0.2); 
                     triggerHaptic(event.target, 1.0, 50);
                 }
 
                 updatePieceVisuals();
                 ghostPiece.visible = false;
-                
-                // Resume Gravity
                 isGrabbing = false;
                 grabbedObject = null;
                 grabController = null;
@@ -431,21 +483,14 @@
         // --- GAME LOOP ---
 
         function render(timestamp, frame) {
-            if (gameState === 1 && frame) { // Scanning
-                handleHitTest(frame);
-            }
+            if (gameState === 1 && frame) handleHitTest(frame);
 
-            // Ghost Piece Logic (While Grabbing)
             if (isGrabbing && grabbedObject) {
                 const worldPos = new THREE.Vector3();
                 grabbedObject.getWorldPosition(worldPos);
-                // Transform to local board space
                 gameBoard.worldToLocal(worldPos);
-                
-                // Calculate Snap target
                 const gx = Math.round(worldPos.x / BLOCK_SIZE + (BOARD_W / 2) - 0.5);
                 const gy = Math.round((BOARD_H / 2 - 0.5) - (worldPos.y / BLOCK_SIZE));
-                
                 if (gx >= 0 && gx < BOARD_W && gy < BOARD_H) {
                     ghostPiece.visible = true;
                     ghostPiece.position.set(
@@ -453,38 +498,35 @@
                         (BOARD_H/2 - 0.5 - gy) * BLOCK_SIZE,
                         0
                     );
-                    // Color code ghost: Green if valid, Red if invalid
                     const isValid = isValidMove(grabbedObject, { pos: {x: gx, y: gy} });
                     ghostPiece.children[0].material.color.setHex(isValid ? 0x00FF00 : 0xFF0000);
                 } else {
                     ghostPiece.visible = false;
                 }
             }
-
             renderer.render(scene, camera);
         }
 
         function handleHitTest(frame) {
+            if(currentSessionMode === 'immersive-vr') return; // No hit test in VR
+
             const session = renderer.xr.getSession();
             if (!session) return;
-            
             if (!hitTestSource) {
                 session.requestReferenceSpace('viewer').then(refSpace => {
                     session.requestHitTestSource({ space: refSpace }).then(source => hitTestSource = source);
                 });
                 return;
             }
-
             const results = frame.getHitTestResults(hitTestSource);
             if (results.length) {
                 const hit = results[0];
                 const pose = hit.getPose(renderer.xr.getReferenceSpace());
                 placementGrid.visible = true;
                 placementGrid.matrix.fromArray(pose.transform.matrix);
-                
                 if (gameState === 1) {
                     ui.msgText.innerText = "Tap trigger to Place";
-                    gameState = 2; // Ready to place
+                    gameState = 2; 
                 }
             } else {
                 placementGrid.visible = false;
@@ -496,18 +538,18 @@
         }
 
         function startGame() {
-            // Lock board position
-            const pos = new THREE.Vector3();
-            const quat = new THREE.Quaternion();
-            const scale = new THREE.Vector3();
-            placementGrid.matrix.decompose(pos, quat, scale);
-            
-            gameBoard.position.copy(pos);
-            gameBoard.quaternion.copy(quat);
-            // Lift board slightly so blocks sit ON grid
-            gameBoard.translateY( (BOARD_H/2) * BLOCK_SIZE ); 
+            // For AR, lock grid. For VR, it's already placed.
+            if (currentSessionMode === 'immersive-ar') {
+                const pos = new THREE.Vector3();
+                const quat = new THREE.Quaternion();
+                const scale = new THREE.Vector3();
+                placementGrid.matrix.decompose(pos, quat, scale);
+                gameBoard.position.copy(pos);
+                gameBoard.quaternion.copy(quat);
+                gameBoard.translateY( (BOARD_H/2) * BLOCK_SIZE ); 
+                placementGrid.visible = false;
+            }
 
-            placementGrid.visible = false;
             ui.hud.style.opacity = 1;
             ui.msgBox.style.display = 'none';
             ui.intro.style.opacity = 0;
@@ -516,14 +558,12 @@
             gameState = 3; 
             score = 0; level = 1;
             updateScore(0);
-            
             spawnPiece();
             gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
         function gameTick() {
-            if (!currentPiece || isGrabbing) return; // Don't drop if holding
-            
+            if (!currentPiece || isGrabbing) return;
             if (isValidMove(currentPiece, { y: 1 })) {
                 currentPiece.userData.gridPos.y++;
                 updatePieceVisuals();
@@ -534,47 +574,28 @@
 
         function spawnPiece() {
             const typeId = Math.floor(Math.random() * SHAPES.length);
-            const shape = SHAPES[typeId][0]; // Initial rotation
+            const shape = SHAPES[typeId][0]; 
             const color = COLORS[typeId];
-
             const group = new THREE.Group();
-            group.userData = {
-                shape: shape,
-                typeId: typeId,
-                rotId: 0,
-                gridPos: { x: Math.floor(BOARD_W/2)-1, y: 0 }
-            };
-
-            // Create blocks
+            group.userData = { shape: shape, typeId: typeId, rotId: 0, gridPos: { x: Math.floor(BOARD_W/2)-1, y: 0 } };
             const geo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-            const mat = new THREE.MeshStandardMaterial({ 
-                color: color, 
-                roughness: 0.2, 
-                metalness: 0.1,
-                transparent: true, opacity: 0.9
-            });
+            const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.9 });
             const edgeGeo = new THREE.EdgesGeometry(geo);
             const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-
             shape.forEach((row, y) => {
                 row.forEach((val, x) => {
                     if (val) {
                         const m = new THREE.Mesh(geo, mat);
                         m.add(new THREE.LineSegments(edgeGeo, edgeMat));
-                        // Local pos in piece group
                         m.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
                         group.add(m);
                     }
                 });
             });
-
             gameBoard.add(group);
             currentPiece = group;
             updatePieceVisuals();
-
-            if (!isValidMove(currentPiece, {})) {
-                gameOver();
-            }
+            if (!isValidMove(currentPiece, {})) gameOver();
         }
 
         function updatePieceVisuals() {
@@ -589,42 +610,28 @@
             if(!currentPiece) return;
             const ud = currentPiece.userData;
             const shape = ud.shape;
-            
             const pieceX = ud.gridPos.x;
             const pieceY = ud.gridPos.y;
-
             shape.forEach((row, ry) => {
                 row.forEach((val, rx) => {
                     if (val) {
                         const gx = pieceX + rx;
                         const gy = pieceY + ry;
                         if (gy >= 0 && gy < BOARD_H && gx >= 0 && gx < BOARD_W) {
-                            grid[gy][gx] = 1; // Occupied
-                            
-                            // Recreate mesh at static position
-                            const oldBlock = currentPiece.children.find(b => 
-                                Math.abs(b.position.x - rx*BLOCK_SIZE) < 0.001 && 
-                                Math.abs(b.position.y - (-ry*BLOCK_SIZE)) < 0.001
-                            );
-                            
+                            grid[gy][gx] = 1; 
+                            const oldBlock = currentPiece.children.find(b => Math.abs(b.position.x - rx*BLOCK_SIZE) < 0.001 && Math.abs(b.position.y - (-ry*BLOCK_SIZE)) < 0.001);
                             if (oldBlock) {
                                 const newBlock = oldBlock.clone();
-                                newBlock.position.set(
-                                    (gx - BOARD_W/2 + 0.5) * BLOCK_SIZE,
-                                    (BOARD_H/2 - 0.5 - gy) * BLOCK_SIZE,
-                                    0
-                                );
+                                newBlock.position.set((gx - BOARD_W/2 + 0.5) * BLOCK_SIZE, (BOARD_H/2 - 0.5 - gy) * BLOCK_SIZE, 0);
                                 gameBoard.add(newBlock);
                             }
                         }
                     }
                 });
             });
-
             gameBoard.remove(currentPiece);
             currentPiece = null;
-            playSynthSound(200, 'square', 0.1); // Thud
-            
+            playSynthSound(200, 'square', 0.1); 
             checkLines();
             spawnPiece();
         }
@@ -639,9 +646,7 @@
                     y++; 
                 }
             }
-
             if (cleared > 0) {
-                // Rebuild entire visual board
                 for(let i=gameBoard.children.length-1; i>=0; i--){
                     if(gameBoard.children[i] !== currentPiece && gameBoard.children[i] !== ghostPiece) {
                         gameBoard.remove(gameBoard.children[i]);
@@ -649,23 +654,17 @@
                 }
                 const geo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
                 const edgeGeo = new THREE.EdgesGeometry(geo);
-                
                 grid.forEach((row, gy) => {
                     row.forEach((val, gx) => {
                         if (val) {
                             const mat = new THREE.MeshStandardMaterial({ color: 0x888888 }); 
                             const m = new THREE.Mesh(geo, mat);
                             m.add(new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({color:0})));
-                            m.position.set(
-                                (gx - BOARD_W/2 + 0.5) * BLOCK_SIZE,
-                                (BOARD_H/2 - 0.5 - gy) * BLOCK_SIZE,
-                                0
-                            );
+                            m.position.set((gx - BOARD_W/2 + 0.5) * BLOCK_SIZE, (BOARD_H/2 - 0.5 - gy) * BLOCK_SIZE, 0);
                             gameBoard.add(m);
                         }
                     });
                 });
-
                 playSynthSound(600 + (cleared*100), 'sine', 0.3);
                 updateScore(cleared);
             }
@@ -676,7 +675,6 @@
             const shape = delta.shape || ud.shape;
             const px = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
             const py = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
-
             for(let y=0; y<shape.length; y++){
                 for(let x=0; x<shape[y].length; x++){
                     if(shape[y][x]){
@@ -690,41 +688,6 @@
             return true;
         }
 
-        function rotatePiece() {
-            if(!currentPiece) return;
-            const ud = currentPiece.userData;
-            const curShape = ud.shape;
-            
-            const N = curShape.length;
-            const M = curShape[0].length;
-            const newShape = Array(M).fill().map(()=>Array(N).fill(0));
-            for(let y=0; y<N; y++){
-                for(let x=0; x<M; x++){
-                    newShape[x][N-1-y] = curShape[y][x];
-                }
-            }
-
-            if(isValidMove(currentPiece, {shape: newShape})){
-                ud.shape = newShape;
-                while(currentPiece.children.length) currentPiece.remove(currentPiece.children[0]);
-                
-                const geo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-                const mat = new THREE.MeshStandardMaterial({ color: COLORS[ud.typeId], roughness:0.2 });
-                const edgeGeo = new THREE.EdgesGeometry(geo);
-                
-                newShape.forEach((row, y) => {
-                    row.forEach((val, x) => {
-                        if(val){
-                            const m = new THREE.Mesh(geo, mat);
-                            m.add(new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({color:0})));
-                            m.position.set(x*BLOCK_SIZE, -y*BLOCK_SIZE, 0);
-                            currentPiece.add(m);
-                        }
-                    });
-                });
-            }
-        }
-
         function gameOver() {
             clearInterval(gameLoopInterval);
             gameState = 4;
@@ -735,12 +698,9 @@
 
         function resetGame() {
             grid = Array(BOARD_H).fill().map(()=>Array(BOARD_W).fill(0));
-            // Clear board
             while(gameBoard.children.length) gameBoard.remove(gameBoard.children[0]);
-            // Re-add ghost piece which was removed
             gameBoard.add(ghostPiece);
             ghostPiece.visible = false;
-            
             ui.gameOver.style.display = 'none';
             startGame();
         }
@@ -754,7 +714,6 @@
             currentDropSpeed = Math.max(100, 1000 - (level*50));
         }
 
-        // --- INPUT HANDLERS ---
         function handleKey(e) {
             if(gameState !== 3 || isGrabbing) return;
             if(e.key === 'ArrowLeft') move(-1);
@@ -763,14 +722,25 @@
             if(e.code === 'Space') rotatePiece();
         }
 
-        function move(dir) {
-            if(isValidMove(currentPiece, {x: dir})){
-                currentPiece.userData.gridPos.x += dir;
-                updatePieceVisuals();
+        function rotatePiece() {
+            if(!currentPiece) return;
+            const ud = currentPiece.userData;
+            const curShape = ud.shape;
+            const N = curShape.length; const M = curShape[0].length;
+            const newShape = Array(M).fill().map(()=>Array(N).fill(0));
+            for(let y=0; y<N; y++) for(let x=0; x<M; x++) newShape[x][N-1-y] = curShape[y][x];
+            if(isValidMove(currentPiece, {shape: newShape})){
+                ud.shape = newShape;
+                while(currentPiece.children.length) currentPiece.remove(currentPiece.children[0]);
+                const geo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                const mat = new THREE.MeshStandardMaterial({ color: COLORS[ud.typeId], roughness:0.2 });
+                const edgeGeo = new THREE.EdgesGeometry(geo);
+                newShape.forEach((row, y) => { row.forEach((val, x) => { if(val){ const m = new THREE.Mesh(geo, mat); m.add(new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({color:0}))); m.position.set(x*BLOCK_SIZE, -y*BLOCK_SIZE, 0); currentPiece.add(m); }});});
             }
         }
 
-        // --- TOUCH ---
+        function move(dir) { if(isValidMove(currentPiece, {x: dir})){ currentPiece.userData.gridPos.x += dir; updatePieceVisuals(); }}
+
         function setupTouch() {
             let tx=0, ty=0;
             window.addEventListener('touchstart', e => { tx=e.touches[0].clientX; ty=e.touches[0].clientY; });
@@ -778,23 +748,13 @@
                 if(gameState !== 3) return;
                 const dx = e.changedTouches[0].clientX - tx;
                 const dy = e.changedTouches[0].clientY - ty;
-                if(Math.abs(dx) > Math.abs(dy)) {
-                    if(Math.abs(dx) > 30) move(dx>0?1:-1);
-                } else {
-                    if(dy > 30) gameTick(); // Swipe Down
-                    else if(dy < -30) rotatePiece(); // Swipe Up
-                }
+                if(Math.abs(dx) > Math.abs(dy)) { if(Math.abs(dx) > 30) move(dx>0?1:-1); } 
+                else { if(dy > 30) gameTick(); else if(dy < -30) rotatePiece(); }
             });
         }
 
-        // --- AUDIO SYSTEM (Web Audio API) ---
-        function setupAudio() {
-            // Unlocking is handled on user click
-        }
-        function unlockAudio() {
-            if(audioCtx.state === 'suspended') audioCtx.resume();
-        }
-        // Synthesizer for SFX (No files needed)
+        function setupAudio() {}
+        function unlockAudio() { if(audioCtx.state === 'suspended') audioCtx.resume(); }
         function playSynthSound(freq, type, duration) {
             if(audioCtx.state === 'suspended') return;
             const osc = audioCtx.createOscillator();
@@ -809,7 +769,6 @@
             osc.stop(audioCtx.currentTime + duration);
         }
 
-        // --- RECORDING ---
         function toggleRecord() {
             if(isRecording) {
                 mediaRecorder.stop();
@@ -824,29 +783,18 @@
                 mediaRecorder.ondataavailable = e => { if(e.data.size>0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = saveVideo;
                 mediaRecorder.start();
-                
                 isRecording = true;
                 ui.recBtn.classList.add('recording');
                 ui.recPanel.style.display = 'flex';
                 let s = 0;
-                recTimerInt = setInterval(() => {
-                    s++;
-                    const min = Math.floor(s/60).toString().padStart(2,'0');
-                    const sec = (s%60).toString().padStart(2,'0');
-                    ui.recTime.innerText = `${min}:${sec}`;
-                }, 1000);
+                recTimerInt = setInterval(() => { s++; const min = Math.floor(s/60).toString().padStart(2,'0'); const sec = (s%60).toString().padStart(2,'0'); ui.recTime.innerText = `${min}:${sec}`; }, 1000);
             }
         }
-
         function saveVideo() {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'immersive-tetris.webm';
-            a.click();
+            const a = document.createElement('a'); a.href = url; a.download = 'immersive-tetris.webm'; a.click();
         }
-
     </script>
 </body>
 </html>

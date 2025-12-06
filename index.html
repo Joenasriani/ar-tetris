@@ -1,1380 +1,854 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <title>AR Tetris 3D (v66 - VR Hand Grabbing)</title>
+    <title>AR/VR Tetris 3D (Immersive Edition)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <!-- Required for AR/VR -->
     <meta name="xr-spatial-tracking" content="true">
     
-    <!-- Load Google Font: Montserrat (Medium & Bold) -->
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <!-- Load Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
-        /* Basic reset */
+        /* --- CORE STYLES --- */
         body, html {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
+            width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
             font-family: 'Montserrat', sans-serif; 
-            font-weight: 400; 
-            background-color: #111;
-            color: white;
-            touch-action: none; 
+            background-color: #050505; color: white; touch-action: none; 
+        }
+        canvas { display: block; width: 100%; height: 100%; outline: none; }
+        
+        /* Hide default AR button to use our custom one */
+        #default-ar-button { display: none !important; }
+
+        /* --- UI ELEMENTS --- */
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.85); 
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px; pointer-events: none; 
         }
 
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
+        #hud-panel {
+            position: absolute; top: 20px; left: 20px;
+            padding: 12px 18px; display: flex; flex-direction: column; gap: 4px;
+            z-index: 100; opacity: 0; transition: opacity 0.5s ease;
         }
+        .hud-row { display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 700; }
+        .hud-label { color: #888; margin-right: 12px; font-weight: 500; }
+        #score-val { color: #FFDC00; }
+        #level-val { color: #00FFFF; }
 
-        #default-ar-button {
-            display: none !important;
-            visibility: hidden !important;
-        }
-
-        /* UI Elements */
-        .ui-element {
-            position: absolute;
-            left: 20px; 
-            padding: 8px 16px; 
-            background-color: rgba(0, 0, 0, 0.6);
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            text-align: center;
-            font-size: 1rem; 
-            font-weight: 600;
+        /* Recording Indicator */
+        #recording-panel {
+            position: absolute; top: 100px; left: 20px;
+            display: none; align-items: center; gap: 8px;
+            padding: 6px 12px; border-radius: 20px;
+            background: rgba(255, 0, 0, 0.15); border: 1px solid rgba(255, 0, 0, 0.4);
             z-index: 100;
-            pointer-events: none; 
-            letter-spacing: 0.5px;
-            font-family: 'Montserrat', sans-serif; 
         }
+        #recording-dot {
+            width: 8px; height: 8px; background-color: #FF4136;
+            border-radius: 50%; animation: blink-red 1s infinite;
+        }
+        #rec-time { font-size: 0.8rem; font-weight: 600; color: #FF4136; font-variant-numeric: tabular-nums; }
+        @keyframes blink-red { 50% { opacity: 0.3; } }
 
+        /* Controls */
+        .control-btn {
+            position: absolute; width: 48px; height: 48px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; z-index: 102; pointer-events: auto;
+            background: rgba(40, 40, 40, 0.6); backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.2); color: white;
+            transition: transform 0.1s;
+        }
+        .control-btn:active { transform: scale(0.92); }
+        #music-toggle { top: 20px; right: 20px; }
+        #record-button { top: 80px; right: 20px; }
+        #record-button.recording { background: rgba(255, 0, 0, 0.8); animation: pulse-rec 2s infinite; }
+        @keyframes pulse-rec { 0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.6); } 70% { box-shadow: 0 0 0 10px transparent; } }
+
+        /* Game Messages */
         #message-box {
-            left: 50%;
-            transform: translateX(-50%);
-            top: 20px;
-            display: none;
-            max-width: 90%;
-        }
-        
-        #game-over-box {
-            left: 50%;
-            top: 40%; 
-            transform: translate(-50%, -50%);
-            color: #FF4136;
-            font-size: 1.8rem; 
-            font-weight: 600;
-            display: none;
-            text-shadow: 2px 2px 0px #000;
-            padding: 20px 40px;
-            font-family: 'Montserrat', sans-serif;
+            position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+            z-index: 100; padding: 12px 24px; text-align: center;
+            display: none; align-items: center; gap: 10px; font-weight: 600;
+            white-space: nowrap; pointer-events: none;
         }
 
-        #score-box {
-            top: 20px;
-            transform: none; 
-            color: #FFDC00;
-            display: none; 
-        }
-        
-        #level-box {
-            top: 70px; 
-            transform: none;
-            color: #00FFFF; 
-            font-size: 0.9rem; 
-            display: none; 
-        }
-
-        #recording-indicator {
-            position: absolute;
-            top: 120px; 
-            left: 25px; 
-            width: 15px;
-            height: 15px;
-            background-color: red;
-            border-radius: 50%;
-            display: none; 
-            z-index: 103;
-            box-shadow: 0 0 8px rgba(255, 0, 0, 0.8);
-            animation: blink-red 1s infinite;
-        }
-        
-        @keyframes blink-red {
-            0% { opacity: 1; }
-            50% { opacity: 0.3; }
-            100% { opacity: 1; }
-        }
-
-        /* Custom AR Button */
+        /* Launch Button */
         #custom-ar-button {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 14px 28px;
-            border-radius: 50px;
-            background: linear-gradient(145deg, #8a2be2, #4169e1);
-            color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.1rem; 
-            font-weight: 600;
-            border: none;
-            box-shadow: 0 6px 20px rgba(65, 105, 225, 0.5);
-            cursor: pointer;
-            z-index: 101;
-            transition: all 0.3s ease;
-            pointer-events: auto; 
-            text-transform: uppercase;
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            padding: 16px 40px; border-radius: 50px;
+            background: linear-gradient(135deg, #8a2be2, #4169e1);
+            color: white; font-family: 'Montserrat', sans-serif; font-size: 1.1rem; font-weight: 800;
+            border: none; box-shadow: 0 8px 20px rgba(138, 43, 226, 0.4);
+            cursor: pointer; z-index: 101; letter-spacing: 1px; text-transform: uppercase;
+            animation: btn-pulse 2s infinite;
         }
+        @keyframes btn-pulse { 0% { box-shadow: 0 0 0 0 rgba(138,43,226,0.7); } 70% { box-shadow: 0 0 0 15px transparent; } }
 
-        /* Replay Button */
+        /* Game Over */
+        #game-over-card {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 85%; max-width: 320px; padding: 30px;
+            display: none; flex-direction: column; align-items: center; gap: 20px;
+            z-index: 105; text-align: center; pointer-events: auto;
+        }
+        .go-title { font-size: 2.2rem; font-weight: 900; color: #FF4136; margin: 0; }
+        .stat-row { display: flex; justify-content: space-between; width: 100%; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
         #replay-button {
-            position: absolute;
-            top: calc(50% + 80px); 
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 10px 25px;
-            border-radius: 20px;
-            background: linear-gradient(145deg, #2ecc71, #27ae60); 
-            color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1rem; 
-            font-weight: 600;
-            border: none;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.5);
-            cursor: pointer;
-            z-index: 101;
-            transition: all 0.3s ease;
-            pointer-events: auto;
-            display: none;
-            text-transform: uppercase;
+            width: 100%; padding: 14px; border-radius: 30px;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none; color: white; font-weight: 700; font-size: 1rem;
+            cursor: pointer; margin-top: 10px;
         }
 
-        /* Music Toggle Button */
-        #music-toggle {
-            position: absolute;
-            top: 20px;
-            right: 20px; 
-            width: 36px; 
-            height: 36px;
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 102; 
-            pointer-events: auto;
-            transition: background-color 0.2s;
-        }
-
-        #music-toggle svg {
-            width: 18px;
-            height: 18px;
-            fill: white;
-        }
-
-        /* Recording Button */
-        #record-button {
-            position: absolute;
-            top: 74px; 
-            right: 20px;
-            width: 36px;
-            height: 36px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            display: none; 
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 102;
-            pointer-events: auto;
-            transition: transform 0.1s, background-color 0.2s;
-        }
-
-        #record-button.recording {
-            background: rgba(255, 0, 0, 0.9); 
-            border-color: #FF4136;
-            animation: pulse-record 2s infinite;
-        }
-
-        #record-button svg {
-            width: 18px;
-            height: 18px;
-            fill: white;
-        }
-        
-        @keyframes pulse-record {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        
-        /* Intro Screen Styles */
+        /* Intro */
         #intro-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: none; 
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background-color: rgba(0, 0, 0, 0.7); 
-            z-index: 200; 
-            opacity: 0;
-            transition: opacity 0.5s ease-in-out;
+            position: absolute; inset: 0; background: black;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 200; transition: opacity 0.8s;
         }
-        
-        #intro-title {
-            font-family: 'Montserrat', sans-serif; 
-            font-weight: 800; 
-            font-size: 2.5rem; 
-            color: #FF00FF; 
-            text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000;
-            margin-bottom: 10px;
-            text-align: center;
-            animation: pulse 1.5s infinite alternate;
-        }
-        
-        #intro-subtitle {
-            font-family: 'Montserrat', sans-serif; 
-            font-weight: 400;
-            font-size: 1rem; 
-            color: #00FFFF; 
-            text-shadow: 0 0 5px #00FFFF;
-            letter-spacing: 4px;
-            text-transform: uppercase;
-        }
-        
+        .intro-t1 { font-size: 3.5rem; font-weight: 900; color: #FF00FF; line-height: 0.9; text-align: center; }
+        .intro-t2 { font-size: 1.2rem; font-weight: 300; color: #00FFFF; letter-spacing: 5px; margin-top: 10px; }
         #intro-credits {
-            position: absolute;
-            bottom: 100px; 
-            left: 0;
-            width: 100%;
-            text-align: center;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.7rem;
-            color: #888; 
-            line-height: 1.5;
-            z-index: 201; 
-            pointer-events: none;
+            position: absolute; bottom: 30px; width: 100%; text-align: center;
+            color: #666; font-size: 0.75rem; pointer-events: none; line-height: 1.6;
         }
-        
-        @keyframes pulse {
-            from { transform: scale(1); text-shadow: 0 0 10px #FF00FF, 2px 2px 0 #000; }
-            to { transform: scale(1.05); text-shadow: 0 0 20px #FF00FF, 2px 2px 0 #000; }
-        }
-
     </style>
 </head>
-
 <body>
-    <!-- UI -->
-    <div id="message-box" class="ui-element">Scan floor to start</div>
-    <div id="game-over-box" class="ui-element">GAME OVER</div>
-    
-    <div id="score-box" class="ui-element">Score: 0</div>
-    <div id="level-box" class="ui-element">Level: 1</div>
-    <div id="recording-indicator"></div>
 
-    <!-- Intro Screen -->
+    <!-- UI LAYER -->
     <div id="intro-screen">
-        <div id="intro-title">ROCKIN'<br>TETRIS</div>
-        <div id="intro-subtitle">in AR</div>
-        <div id="intro-credits">
-            Developed by JN<br>
-            Using Vibe Coding AI<br>
-            Music by The 8-bit Big Band<br>
-            (C)APEX INNOVATE 2025
-        </div>
+        <div class="intro-t1">TETRIS<br>XR</div>
+        <div class="intro-t2">AR/VR EDITION</div>
     </div>
 
-    <!-- Music Toggle -->
-    <button id="music-toggle" class="control-btn" aria-label="Toggle Music">
-        <svg id="icon-sound-on" viewBox="0 0 24 24">
-            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-        </svg>
-        <svg id="icon-sound-off" viewBox="0 0 24 24" style="display: none;">
-            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-        </svg>
-    </button>
+    <div id="hud-panel" class="glass-panel">
+        <div class="hud-row"><span class="hud-label">SCORE</span><span id="score-val">0</span></div>
+        <div class="hud-row"><span class="hud-label">LEVEL</span><span id="level-val">1</span></div>
+    </div>
 
-    <!-- Recording Button -->
-    <button id="record-button" class="control-btn" aria-label="Record Video">
-        <!-- Circle Icon for Record -->
-        <svg id="icon-record" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="8" />
-        </svg>
-        <!-- Square Icon for Stop (hidden by default) -->
-        <svg id="icon-stop" viewBox="0 0 24 24" style="display: none;">
-            <rect x="6" y="6" width="12" height="12" />
-        </svg>
-    </button>
+    <div id="recording-panel">
+        <div id="recording-dot"></div>
+        <div id="rec-time">00:00</div>
+    </div>
 
-    <button id="custom-ar-button">
-        Launch AR
-    </button>
-    
-    <button id="replay-button">
-        Play Again
-    </button>
-    
-    <!-- Audio -->
-    <audio id="audio-tts" preload="auto" playsinline></audio>
-    
-    <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
-    <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
-    <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
-    <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
-    <!-- TOOT Sound -->
-    <audio id="audio-toot" src="data:audio/wav;base64,UklGRl9vT1ZYXxcqU1qa..." preload="auto" playsinline></audio>
+    <div id="message-box" class="glass-panel"><span id="message-text">Scan floor</span></div>
 
-    <!-- Three.js -->
+    <div id="game-over-card" class="glass-panel">
+        <div class="go-title">GAME OVER</div>
+        <div class="stat-row"><span>Score</span><span id="go-score">0</span></div>
+        <div class="stat-row"><span>Level</span><span id="go-level">1</span></div>
+        <button id="replay-button">PLAY AGAIN</button>
+    </div>
+
+    <!-- BUTTONS -->
+    <button id="music-toggle" class="control-btn"><span class="material-icons-round" id="icon-music">volume_up</span></button>
+    <button id="record-button" class="control-btn"><span class="material-icons-round" id="icon-rec">fiber_manual_record</span></button>
+    <button id="custom-ar-button">ENTER IMMERSIVE</button>
+    
+    <div id="intro-credits">
+        Developed by JN with Vibe Coding AI<br>
+        Controls: Arrows (PC) / Touch (Mobile) / Hands (VR)<br>
+        v68 - AR/VR Edition
+    </div>
+
+    <!-- THREE.JS IMPORTS -->
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
-            }
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
         }
+    }
     </script>
-    
+
     <script type="module">
         import * as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-        
-        // --- Global Variables ---
+
+        // --- GLOBAL VARIABLES ---
         let camera, scene, renderer;
+        let controller1, controller2, controllerGrip1, controllerGrip2;
+        let raycaster;
         let hitTestSource = null;
-        let placementGrid = null; 
-        let gameBoard = null; 
-        let currentPiece = null;
-        let gameLoopInterval = null;
+        let localSpace = null;
         
-        // VR Hand Vars
-        let controllers = [];
-        let controllerGrips = [];
-        let grabbedBlock = null;
+        // Game Objects
+        let placementGrid, gameBoard, currentPiece;
+        let ghostPiece = null;
         
-        // UI Vars
-        let customArButton, messageBox, messageText, phoneIcon;
-        let hudPanel, scoreVal, levelVal;
-        let gameOverCard, goScore, goLevel, replayButton;
-        let musicToggleBtn, musicIcon;
-        let recordButton, iconRecord, iconStop, recordingIndicator;
-        let recordingPanel, recTimer;
-        let introCredits;
+        // Logic
+        let gameLoopInterval;
+        let gameState = 0; // 0:Init, 1:Scan, 2:Place, 3:Play, 4:Over
+        let score = 0, level = 1, linesClearedTotal = 0;
+        let currentDropSpeed = 1000;
         
-        let mediaRecorder;
-        let recordedChunks = [];
-        let isRecording = false;
-        let recStartTime;
-        let recInterval;
+        // Interaction (Physics Grab)
+        let isGrabbing = false;
+        let grabbedObject = null;
+        let grabController = null;
         
-        let introScreen;
-        
-        const GAME_STATE = {
-            INITIALIZING: 0,
-            SCANNING: 1,
-            PLACING: 2,
-            PLAYING: 3,
-            GAME_OVER: 4,
-            PAUSED: 5 
-        };
-        let gameState = GAME_STATE.INITIALIZING;
-        let score = 0;
-        
-        // --- Level Variables ---
-        let level = 1;
-        let linesClearedTotal = 0;
-        let currentDropSpeed = 1000; 
-        const MIN_DROP_SPEED = 100; 
-
-        const BOARD_WIDTH = 10;
-        const BOARD_HEIGHT = 20; 
-        const BLOCK_SIZE = 0.1; 
-        
-        let grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
-        
+        // Constants
+        const BOARD_W = 10, BOARD_H = 20, BLOCK_SIZE = 0.08; // 8cm blocks
+        const COLORS = [0x00F0F0, 0xF0F000, 0xA000F0, 0x00F000, 0xF00000, 0x0000F0, 0xF0A000];
         const SHAPES = [
-            [[[1,1,1,1]], [[1],[1],[1],[1]]],
-            [[[1,1],[1,1]]],
-            [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]],
-            [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]],
-            [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]],
-            [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]],
-            [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]
+            [[[1,1,1,1]], [[1],[1],[1],[1]]], // I
+            [[[1,1],[1,1]]], // O
+            [[[0,1,0],[1,1,1]], [[1,0],[1,1],[1,0]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]], // T
+            [[[0,1,1],[1,1,0]], [[1,0],[1,1],[0,1]]], // S
+            [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]], // Z
+            [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]], // J
+            [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]  // L
         ];
-        const COLORS = {
-            1: 0x00F0F0, 2: 0xF0F000, 3: 0xA000F0, 4: 0x00F000, 5: 0xF00000, 6: 0x0000F0, 7: 0xF0A000,
+        
+        let grid = Array(BOARD_H).fill().map(()=>Array(BOARD_W).fill(0));
+
+        // Audio Context
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // UI DOM
+        const ui = {
+            arBtn: document.getElementById('custom-ar-button'),
+            hud: document.getElementById('hud-panel'),
+            score: document.getElementById('score-val'),
+            level: document.getElementById('level-val'),
+            msgBox: document.getElementById('message-box'),
+            msgText: document.getElementById('message-text'),
+            gameOver: document.getElementById('game-over-card'),
+            intro: document.getElementById('intro-screen'),
+            recBtn: document.getElementById('record-button'),
+            recPanel: document.getElementById('recording-panel'),
+            recTime: document.getElementById('rec-time')
         };
 
-        let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
-        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let audioUnlocked = false;
-        let isMusicMuted = false; 
-        let blueGridMat, greenGridMat;
+        // Recorder
+        let mediaRecorder, recordedChunks = [], recTimerInt;
+        let isRecording = false;
 
-        function triggerHaptic(duration = 20) {
-            if (navigator.vibrate) navigator.vibrate(duration);
-        }
-
-        function playToot() {
-            if(audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1); 
-            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); 
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
-        }
-        
         init();
+        setupAudio();
 
         function init() {
+            // Scene Setup
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
+            
+            // Lighting
+            const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 2); 
+            hemi.position.set(0, 2, 0);
+            scene.add(hemi);
+            const dir = new THREE.DirectionalLight(0xffffff, 2);
+            dir.position.set(0, 5, 2);
+            scene.add(dir);
 
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
-            light.position.set(0.5, 1, 0.25);
-            scene.add(light);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
-            directionalLight.position.set(0, 10, 0);
-            scene.add(directionalLight);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
-            
-            // Bind UI Elements
-            customArButton = document.getElementById('custom-ar-button');
-            introCredits = document.getElementById('intro-credits');
-            
-            messageBox = document.getElementById('message-box');
-            messageText = document.getElementById('message-text');
-            phoneIcon = document.querySelector('.phone-icon');
-            
-            hudPanel = document.getElementById('hud-panel');
-            scoreVal = document.getElementById('score-val');
-            levelVal = document.getElementById('level-val');
-            
-            gameOverCard = document.getElementById('game-over-card');
-            goScore = document.getElementById('go-score');
-            goLevel = document.getElementById('go-level');
-            replayButton = document.getElementById('replay-button');
-            
-            introScreen = document.getElementById('intro-screen');
-            
-            musicToggleBtn = document.getElementById('music-toggle');
-            musicIcon = document.getElementById('icon-music');
-            iconSoundOn = document.getElementById('icon-sound-on');
-            iconSoundOff = document.getElementById('icon-sound-off');
 
-            recordButton = document.getElementById('record-button');
-            iconRecord = document.getElementById('icon-record'); 
-            iconStop = document.getElementById('icon-stop');
-            recordingIndicator = document.getElementById('recording-indicator');
-            recordingPanel = document.getElementById('recording-panel');
-            recTimer = document.getElementById('rec-time');
-
-            bgmLoop = document.getElementById('audio-bgm');
-            moveSound = document.getElementById('audio-move');
-            rotateSound = document.getElementById('audio-move'); 
-            gameOverSound = document.getElementById('audio-gameover');
-            lineClearSound = document.getElementById('audio-lineclear');
-
-            // --- VR Hand Tracking Setup ---
-            // We ask for 'hand-tracking' feature but allow 'hit-test' for mobile AR
+            // AR Button
             const arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['hit-test'], 
-                optionalFeatures: ['dom-overlay', 'local-floor', 'hand-tracking'], 
+                requiredFeatures: ['hit-test'],
+                optionalFeatures: ['dom-overlay', 'local-floor', 'hand-tracking'],
                 domOverlay: { root: document.body }
             });
             arButton.id = "default-ar-button"; 
             document.body.appendChild(arButton);
 
-            // --- Initialize Controllers for VR Hands ---
+            // --- CONTROLLERS & INTERACTION ---
+            raycaster = new THREE.Raycaster();
+            
+            // Controller 1
+            controller1 = renderer.xr.getController(0);
+            controller1.addEventListener('selectstart', onSelectStart);
+            controller1.addEventListener('selectend', onSelectEnd);
+            scene.add(controller1);
+            
+            // Controller 2
+            controller2 = renderer.xr.getController(1);
+            controller2.addEventListener('selectstart', onSelectStart);
+            controller2.addEventListener('selectend', onSelectEnd);
+            scene.add(controller2);
+
+            // Visual Lines for Controllers
+            const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-5)]);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+            const line1 = new THREE.Line(lineGeo, lineMat); line1.name = 'line'; line1.scale.z = 1;
+            const line2 = line1.clone();
+            controller1.add(line1);
+            controller2.add(line2);
+
+            // Controller Models (Optional visual hands)
             const controllerModelFactory = new XRControllerModelFactory();
+            controllerGrip1 = renderer.xr.getControllerGrip(0);
+            controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+            scene.add(controllerGrip1);
+            controllerGrip2 = renderer.xr.getControllerGrip(1);
+            controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+            scene.add(controllerGrip2);
 
-            for (let i = 0; i < 2; i++) {
-                const controller = renderer.xr.getController(i);
-                controller.addEventListener('selectstart', onHandSelectStart);
-                controller.addEventListener('selectend', onHandSelectEnd);
-                scene.add(controller);
-                controllers.push(controller);
-                
-                const grip = renderer.xr.getControllerGrip(i);
-                grip.add(controllerModelFactory.createControllerModel(grip));
-                scene.add(grip);
-                controllerGrips.push(grip);
-            }
-
-            // --- STRICT AUDIO UNLOCK ON CLICK ---
-            customArButton.addEventListener('click', () => {
-                console.log("Unlocking audio context...");
-                if(audioCtx.state === 'suspended') audioCtx.resume();
-                triggerHaptic(5); 
-                const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
-                
-                allSounds.forEach(s => {
-                    if(s) {
-                        const p = s.play();
-                        if (p !== undefined) {
-                            p.then(() => {
-                                if(s === bgmLoop) {
-                                    console.log("BGM started successfully");
-                                } else {
-                                    s.pause();
-                                    s.currentTime = 0;
-                                }
-                            }).catch(e => console.warn("Audio play error:", e));
-                        }
-                    }
-                });
-                
-                audioUnlocked = true;
-                arButton.click(); 
-            });
-            
-            replayButton.addEventListener('click', () => {
-                triggerHaptic(5); 
-                resetGame();
-            });
-
-            musicToggleBtn.addEventListener('click', () => {
-                triggerHaptic(5); 
-                toggleMusic();
-            });
-
-            recordButton.addEventListener('click', () => {
-                triggerHaptic(20);
-                playToot(); 
-                if (!isRecording) {
-                    startRecording();
-                } else {
-                    stopRecording();
-                }
-            });
-            
-            window.addEventListener('keydown', (e) => {
-                if (gameState === GAME_STATE.PLAYING) {
-                    if (e.key === 'ArrowLeft') {
-                        movePiece(-1);
-                        e.preventDefault();
-                    } else if (e.key === 'ArrowRight') {
-                        movePiece(1);
-                        e.preventDefault();
-                    } else if (e.key === 'ArrowDown') {
-                        hardDrop();
-                        e.preventDefault();
-                    } else if (e.code === 'Space') {
-                        rotatePiece();
-                        e.preventDefault();
-                    }
-                } else if (gameState === GAME_STATE.PLACING) {
-                     if (e.code === 'Space' || e.code === 'Enter') {
-                        updateMessage("", false); 
-                        playIntroAndStart(); 
-                        e.preventDefault();
-                    }
-                }
-            });
-
-            renderer.xr.addEventListener('sessionstart', () => {
-                if (gameState === GAME_STATE.INITIALIZING) {
-                    // Volume Settings
-                    if (bgmLoop) bgmLoop.volume = 0.02; 
-                    if (moveSound) moveSound.volume = 0.08; 
-                    if (rotateSound) rotateSound.volume = 0.08; 
-                    if (gameOverSound) gameOverSound.volume = 0.08; 
-                    if (lineClearSound) lineClearSound.volume = 0.08; 
-
-                    if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
-                        bgmLoop.play().catch(e => console.error("BGM resume error:", e));
-                    }
-                    
-                    customArButton.style.display = 'none';
-                    introCredits.style.display = 'none'; 
-                    recordButton.style.display = 'flex';
-                    gameState = GAME_STATE.SCANNING;
-                    updateMessage("Scan floor to start", true); 
-
-                    const currentSession = renderer.xr.getSession();
-                    currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
-                        currentSession.requestHitTestSource({ 
-                            space: referenceSpace 
-                        }).then((source) => {
-                            hitTestSource = source;
-                        });
-                    });
-                }
-            });
-            
-            renderer.xr.addEventListener('sessionend', () => {
-                if (bgmLoop) bgmLoop.pause();
-                if (isRecording) stopRecording();
-                recordButton.style.display = 'none';
-                window.location.reload();
-            });
-
-            // Touch Controls
-            let touchStartX, touchStartY, touchStartTime;
-            let strafeInterval = null;
-            let isDragging = false;
-            const DRAG_THRESHOLD_Y = 75; 
-            const STRAFE_INTERVAL_MS = 130; 
-
-            function onTouchStart(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button') || e.target.closest('#replay-button')) return;
-
-                e.preventDefault(); 
-                if (gameState === GAME_STATE.PLACING) {
-                    updateMessage("", false); 
-                    playIntroAndStart(); 
-                    return; 
-                }
-                if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) return; 
-
-                if (strafeInterval) clearInterval(strafeInterval);
-                const touch = e.touches[0];
-                touchStartX = touch.pageX;
-                touchStartY = touch.pageY;
-                touchStartTime = new Date().getTime();
-                isDragging = false;
-
-                const screenWidth = window.innerWidth;
-                if (touchStartX < screenWidth * 0.33) {
-                    movePiece(-1); 
-                    strafeInterval = setInterval(() => movePiece(-1), STRAFE_INTERVAL_MS);
-                } else if (touchStartX > screenWidth * 0.66) {
-                    movePiece(1); 
-                    strafeInterval = setInterval(() => movePiece(1), STRAFE_INTERVAL_MS);
-                }
-            }
-            
-            function onTouchMove(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
-                e.preventDefault();
-                if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) return;
-                
-                const touch = e.touches[0];
-                const deltaY = touch.pageY - touchStartY;
-                
-                if (deltaY > DRAG_THRESHOLD_Y) {
-                    if (strafeInterval) clearInterval(strafeInterval); 
-                    hardDrop();
-                    touchStartY = null; 
-                    touchStartX = null;
-                    isDragging = true; 
-                }
-            }
-            
-            function onTouchEnd(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
-                e.preventDefault();
-                if (gameState !== GAME_STATE.PLAYING) return;
-                if (strafeInterval) clearInterval(strafeInterval);
-                if (isDragging) { isDragging = false; return; }
-                
-                const screenWidth = window.innerWidth;
-                const touchTime = new Date().getTime() - touchStartTime;
-
-                if (touchTime < STRAFE_INTERVAL_MS * 1.5) { 
-                    if (touchStartX > screenWidth * 0.33 && touchStartX < screenWidth * 0.66) {
-                        rotatePiece();
-                    }
-                }
-            }
-            
-            renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
-            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
-            renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
-            renderer.domElement.addEventListener('touchcancel', onTouchEnd, { passive: false });
-
-            window.addEventListener('resize', onWindowResize);
-            
-            blueGridMat = new THREE.MeshBasicMaterial({ color: 0x00FFFF, wireframe: true, transparent: true, opacity: 0.7 });
-            greenGridMat = new THREE.MeshBasicMaterial({ color: 0x00FF00, wireframe: true, transparent: true, opacity: 0.8 });
-
-            const gridGeo = new THREE.PlaneGeometry(BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH * BLOCK_SIZE, BOARD_WIDTH, BOARD_WIDTH);
-            placementGrid = new THREE.Mesh(gridGeo, blueGridMat);
+            // Game Objects
+            const gridGeo = new THREE.PlaneGeometry(BOARD_W * BLOCK_SIZE, BOARD_W * BLOCK_SIZE);
+            const gridMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.5 });
+            placementGrid = new THREE.Mesh(gridGeo, gridMat);
+            placementGrid.rotation.x = -Math.PI/2;
             placementGrid.visible = false;
-            gridGeo.rotateX(-Math.PI / 2);
-
             scene.add(placementGrid);
-            
+
             gameBoard = new THREE.Group();
-            renderer.setAnimationLoop(animate);
+            scene.add(gameBoard); 
+
+            // Visual Ghost for VR Placement
+            const ghostGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, wireframe: true });
+            ghostPiece = new THREE.Group();
+            // Just one generic box to show target location
+            ghostPiece.add(new THREE.Mesh(ghostGeo, ghostMat));
+            ghostPiece.visible = false;
+            gameBoard.add(ghostPiece);
+
+            // Event Listeners
+            ui.arBtn.addEventListener('click', () => {
+                unlockAudio();
+                arButton.click();
+            });
+
+            // Desktop Controls
+            window.addEventListener('keydown', handleKey);
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            
+            // Touch Controls
+            setupTouch();
+            
+            // UI bindings
+            document.getElementById('replay-button').addEventListener('click', resetGame);
+            ui.recBtn.addEventListener('click', toggleRecord);
+
+            renderer.setAnimationLoop(render);
         }
 
-        // --- Hand Interaction Logic ---
-        function onHandSelectStart(event) {
-            if (gameState !== GAME_STATE.PLAYING) return;
+        // --- INTERACTION LOGIC ---
 
-            const controller = event.target;
-            const handPosition = controller.position;
-
-            // Check proximity to "landed" blocks
-            // We iterate through gameBoard children (blocks)
-            // Only allow grabbing if it is a "top" block
-            // A top block is one that has no block above it (y+1) in the grid
-
-            for (let i = 0; i < gameBoard.children.length; i++) {
-                const block = gameBoard.children[i];
+        function onSelectStart(event) {
+            // 1. Placing Mode
+            if (gameState === 2) { 
+                startGame(); 
+                return; 
+            }
+            
+            // 2. Gameplay Grabbing
+            if (gameState === 3 && currentPiece) {
+                const controller = event.target;
                 
-                // Convert block position to world space to compare with hand
-                const blockWorldPos = new THREE.Vector3();
-                block.getWorldPosition(blockWorldPos);
-
-                const distance = handPosition.distanceTo(blockWorldPos);
+                // Check distance
+                const piecePos = new THREE.Vector3();
+                currentPiece.getWorldPosition(piecePos);
+                const ctrlPos = controller.position;
                 
-                // 0.1m grab radius
-                if (distance < 0.1) {
-                    const gridPos = getBlockGridPos(block);
+                // 35cm grab radius - larger for VR ease of use
+                if (ctrlPos.distanceTo(piecePos) < 0.35) {
+                    isGrabbing = true;
+                    grabController = controller;
+                    grabbedObject = currentPiece;
                     
-                    if (isTopBlock(gridPos.x, gridPos.y)) {
-                        grabbedBlock = block;
-                        controller.attach(grabbedBlock); // Attach block to hand
-                        // Remove from grid logic temporarily so pieces can fall through?
-                        // Actually, we need to remove it from the grid array so the game knows its gone
-                        // grid[gridPos.y][gridPos.x] = 0; 
-                        // But we want to rearrange... so maybe just visual attach first?
-                        // Let's remove it from logical grid to allow others to fall or be grabbed
-                        
-                        // Only remove from logical grid if we want gravity to affect others immediately
-                        // For this requirement, we "rearrange some of the top elements".
-                        // Let's simplify: Remove from grid when grabbed.
-                        grid[gridPos.y][gridPos.x] = 0;
-                        break; 
-                    }
+                    // Pause Gravity
+                    clearInterval(gameLoopInterval);
+                    
+                    // Attach to controller to move it
+                    controller.attach(grabbedObject); 
+                    
+                    playSynthSound(440, 'triangle', 0.1); // Feedback beep
+                    triggerHaptic(event.target, 0.5, 20);
                 }
             }
         }
 
-        function onHandSelectEnd(event) {
-            if (grabbedBlock) {
-                const controller = event.target;
-                scene.attach(grabbedBlock); // Detach from hand, back to scene
+        function onSelectEnd(event) {
+            if (isGrabbing && grabController === event.target) {
+                // Detach from hand, attach back to board
+                gameBoard.attach(grabbedObject);
                 
-                // Snap to nearest grid position
-                // Calculate new grid pos based on world pos relative to gameBoard
-                // ... (Logic to snap and re-insert into grid array)
-                // This is complex to implement perfectly without altering game loop structure significantly.
-                // For V66, we'll implement basic grabbing visual.
+                // Calculate Grid Position based on where we dropped it
+                const lx = grabbedObject.position.x;
+                const ly = grabbedObject.position.y;
                 
-                grabbedBlock = null;
+                // Convert to Grid Indices
+                let gx = Math.round(lx / BLOCK_SIZE + (BOARD_W / 2) - 0.5);
+                let gy = Math.round((BOARD_H / 2 - 0.5) - (ly / BLOCK_SIZE));
+
+                // Constrain
+                if (gx < 0) gx = 0; 
+                if (gx >= BOARD_W) gx = BOARD_W - 1;
+                
+                const userData = currentPiece.userData;
+                const oldX = userData.gridPos.x;
+                const oldY = userData.gridPos.y;
+                
+                // Validate
+                if (isValidMove(currentPiece, { pos: {x: gx, y: gy} })) {
+                    userData.gridPos.x = gx;
+                    userData.gridPos.y = gy;
+                    playSynthSound(880, 'sine', 0.1); // Success
+                } else {
+                    // Invalid (inside block), revert
+                    userData.gridPos.x = oldX;
+                    userData.gridPos.y = oldY;
+                    playSynthSound(150, 'sawtooth', 0.2); // Error
+                    triggerHaptic(event.target, 1.0, 50);
+                }
+
+                updatePieceVisuals();
+                ghostPiece.visible = false;
+                
+                // Resume Gravity
+                isGrabbing = false;
+                grabbedObject = null;
+                grabController = null;
+                gameLoopInterval = setInterval(gameTick, currentDropSpeed);
             }
         }
 
-        function getBlockGridPos(block) {
-            // Calculate grid X,Y based on local position
-            const x = Math.round(block.position.x / BLOCK_SIZE + BOARD_WIDTH / 2 - 0.5);
-            const y = Math.round(BOARD_HEIGHT / 2 - 0.5 - block.position.y / BLOCK_SIZE);
-            return {x, y};
+        function triggerHaptic(controller, strength, duration) {
+            if (controller.gamepad && controller.gamepad.hapticActuators && controller.gamepad.hapticActuators.length > 0) {
+                controller.gamepad.hapticActuators[0].pulse(strength, duration);
+            }
         }
 
-        function isTopBlock(x, y) {
-            if (y <= 0) return true; // Top of board
-            // Check if there is a block above (y-1 in grid array logic usually, but visual Y is up)
-            // In our grid, y=0 is top? No, grid logic usually y=0 is top row or bottom?
-            // Let's assume standard array: grid[row][col]. 
-            // Need to check `grid[y-1][x]` if y-1 is "above".
-            // Based on updatePiecePosition: (BOARD_HEIGHT/2 - 0.5 - gridY). 
-            // Higher gridY = Lower visual Y. So gridY=0 is TOP visually? 
-            // Wait, standard Tetris: y=0 is top row spawning, y=20 is bottom.
-            // So "Above" means y-1.
-            
-            if (y > 0 && grid[y-1][x] !== 0) return false; // There is a block above
-            return true;
+        // --- GAME LOOP ---
+
+        function render(timestamp, frame) {
+            if (gameState === 1 && frame) { // Scanning
+                handleHitTest(frame);
+            }
+
+            // Ghost Piece Logic (While Grabbing)
+            if (isGrabbing && grabbedObject) {
+                const worldPos = new THREE.Vector3();
+                grabbedObject.getWorldPosition(worldPos);
+                // Transform to local board space
+                gameBoard.worldToLocal(worldPos);
+                
+                // Calculate Snap target
+                const gx = Math.round(worldPos.x / BLOCK_SIZE + (BOARD_W / 2) - 0.5);
+                const gy = Math.round((BOARD_H / 2 - 0.5) - (worldPos.y / BLOCK_SIZE));
+                
+                if (gx >= 0 && gx < BOARD_W && gy < BOARD_H) {
+                    ghostPiece.visible = true;
+                    ghostPiece.position.set(
+                        (gx - BOARD_W/2 + 0.5) * BLOCK_SIZE,
+                        (BOARD_H/2 - 0.5 - gy) * BLOCK_SIZE,
+                        0
+                    );
+                    // Color code ghost: Green if valid, Red if invalid
+                    const isValid = isValidMove(grabbedObject, { pos: {x: gx, y: gy} });
+                    ghostPiece.children[0].material.color.setHex(isValid ? 0x00FF00 : 0xFF0000);
+                } else {
+                    ghostPiece.visible = false;
+                }
+            }
+
+            renderer.render(scene, camera);
         }
-        
-        function startRecording() {
-            const stream = renderer.domElement.captureStream(30); 
-            const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+
+        function handleHitTest(frame) {
+            const session = renderer.xr.getSession();
+            if (!session) return;
             
-            try {
-                mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-            } catch (e) {
-                console.error("MediaRecorder setup failed:", e);
+            if (!hitTestSource) {
+                session.requestReferenceSpace('viewer').then(refSpace => {
+                    session.requestHitTestSource({ space: refSpace }).then(source => hitTestSource = source);
+                });
                 return;
             }
 
-            recordedChunks = [];
-            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
-            mediaRecorder.onstop = saveAndShareVideo;
-            mediaRecorder.start();
-            isRecording = true;
-            
-            recordButton.classList.add('recording');
-            iconRecord.textContent = "stop"; 
-            recordingPanel.style.display = 'flex';
-            
-            // Start timer
-            recStartTime = Date.now();
-            recInterval = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
-                const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
-                const s = (elapsed % 60).toString().padStart(2, '0');
-                recTimer.textContent = `${m}:${s}`;
-            }, 1000);
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                clearInterval(recInterval);
+            const results = frame.getHitTestResults(hitTestSource);
+            if (results.length) {
+                const hit = results[0];
+                const pose = hit.getPose(renderer.xr.getReferenceSpace());
+                placementGrid.visible = true;
+                placementGrid.matrix.fromArray(pose.transform.matrix);
                 
-                recordButton.classList.remove('recording');
-                iconRecord.textContent = "fiber_manual_record"; 
-                recordingPanel.style.display = 'none';
-                recTimer.textContent = "00:00";
-                
-                updateMessage("Processing video...");
-            }
-        }
-
-        function saveAndShareVideo() {
-            const blob = new Blob(recordedChunks, { type: 'video/mp4' }); 
-            const file = new File([blob], "ar-tetris-gameplay.mp4", { type: 'video/mp4' });
-
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                navigator.share({
-                    title: 'My AR Tetris Gameplay!',
-                    text: 'Check out this cool AR Tetris game!',
-                    files: [file]
-                })
-                .then(() => { updateMessage("Shared!", true); })
-                .catch((error) => { downloadVideo(blob); });
+                if (gameState === 1) {
+                    ui.msgText.innerText = "Tap trigger to Place";
+                    gameState = 2; // Ready to place
+                }
             } else {
-                downloadVideo(blob);
-            }
-        }
-
-        function downloadVideo(blob) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            document.body.appendChild(a);
-            a.style = 'display: none';
-            a.href = url;
-            a.download = 'ar-tetris-gameplay.mp4';
-            a.click();
-            window.URL.revokeObjectURL(url);
-            updateMessage("Video downloaded!", true);
-        }
-
-        function toggleMusic() {
-            if (!bgmLoop) return;
-
-            if (isMusicMuted) {
-                bgmLoop.play().catch(e => console.error("BGM play failed:", e));
-                iconSoundOn.style.display = 'block';
-                iconSoundOff.style.display = 'none';
-                isMusicMuted = false;
-            } else {
-                bgmLoop.pause();
-                iconSoundOn.style.display = 'none';
-                iconSoundOff.style.display = 'block';
-                isMusicMuted = true;
-            }
-        }
-
-        function playSound(audioElement) {
-            if (!audioElement) return;
-            audioElement.currentTime = 0; 
-            audioElement.play().catch(e => console.warn("Sound play warning:", e)); 
-        }
-
-        function animate(timestamp, frame) {
-            if (frame) {
-                const session = renderer.xr.getSession();
-                if (!session) {
-                    renderer.render(scene, camera);
-                    return;
-                }
-
-                // --- Hand Tracking Input Source Loop ---
-                if(session.inputSources) {
-                    for(const source of session.inputSources) {
-                        if(source.hand) {
-                            // Logic for hands...
-                            // This is where you'd update hand meshes if you were rendering them custom
-                            // The XRControllerModelFactory handles visual representation
-                        }
-                    }
-                }
-
-                if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
-                    if (hitTestSource) {
-                        const hitTestResults = frame.getHitTestResults(hitTestSource); 
-
-                        if (hitTestResults.length > 0) {
-                            const hit = hitTestResults[0];
-                            const referenceSpace = renderer.xr.getReferenceSpace();
-                            const pose = hit.getPose(referenceSpace);
-                            
-                            placementGrid.matrix.fromArray(pose.transform.matrix);
-                            placementGrid.matrixAutoUpdate = false; 
-                            placementGrid.visible = true; 
-
-                            const normalY = pose.transform.matrix[5]; 
-                            const isFloor = normalY > 0.85;
-
-                            if (isFloor) {
-                                if (gameState === GAME_STATE.SCANNING) {
-                                    gameState = GAME_STATE.PLACING;
-                                    updateMessage("Tap to lock", false);
-                                    placementGrid.material = greenGridMat; 
-                                    triggerHaptic(50); 
-                                }
-                            } else {
-                                if (gameState === GAME_STATE.PLACING) {
-                                    gameState = GAME_STATE.SCANNING;
-                                    updateMessage("Scan floor to start", true);
-                                    placementGrid.material = blueGridMat; 
-                                }
-                            }
-                        } else {
-                            placementGrid.visible = false; 
-                            if (gameState === GAME_STATE.PLACING) {
-                                gameState = GAME_STATE.SCANNING;
-                                updateMessage("Scan floor to start", true);
-                            }
-                        }
-                    }
-                } else {
-                    placementGrid.visible = false;
+                placementGrid.visible = false;
+                if (gameState === 2) {
+                    gameState = 1; 
+                    ui.msgText.innerText = "Scan floor...";
                 }
             }
-            renderer.render(scene, camera);
-        }
-        
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function updateMessage(message, showIcon = false) {
-            messageText.textContent = message;
-            messageBox.style.display = message ? 'flex' : 'none';
-            phoneIcon.style.display = showIcon ? 'block' : 'none';
-        }
-
-        function playIntroAndStart() {
-            const depthOffset = -0.5; 
-            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
-
-            const targetPos = new THREE.Vector3();
-            targetPos.setFromMatrixPosition(placementGrid.matrix);
-            gameBoard.position.copy(targetPos);
-            
-            const cameraPos = new THREE.Vector3();
-            camera.getWorldPosition(cameraPos);
-            gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
-            
-            // Treat floor as a bit lower (-0.15m)
-            gameBoard.translateY(baseLift - 0.15); 
-            gameBoard.translateZ(depthOffset);
-            
-            scene.add(gameBoard);
-            placementGrid.visible = false; 
-            
-            introScreen.style.display = 'flex';
-            
-            setTimeout(() => {
-                introScreen.style.opacity = '1';
-            }, 50); 
-
-            setTimeout(() => {
-                introScreen.style.opacity = '0';
-                
-                setTimeout(() => {
-                    introScreen.style.display = 'none';
-                    startGame();
-                }, 500); 
-                
-            }, 2500); 
         }
 
         function startGame() {
-            gameState = GAME_STATE.PLAYING;
-            hudPanel.style.opacity = '1'; // Show HUD
+            // Lock board position
+            const pos = new THREE.Vector3();
+            const quat = new THREE.Quaternion();
+            const scale = new THREE.Vector3();
+            placementGrid.matrix.decompose(pos, quat, scale);
+            
+            gameBoard.position.copy(pos);
+            gameBoard.quaternion.copy(quat);
+            // Lift board slightly so blocks sit ON grid
+            gameBoard.translateY( (BOARD_H/2) * BLOCK_SIZE ); 
+
+            placementGrid.visible = false;
+            ui.hud.style.opacity = 1;
+            ui.msgBox.style.display = 'none';
+            ui.intro.style.opacity = 0;
+            setTimeout(()=>ui.intro.style.display='none', 800);
+
+            gameState = 3; 
+            score = 0; level = 1;
             updateScore(0);
             
-            placementGrid.visible = false;
-
             spawnPiece();
-            
             gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
         function gameTick() {
-            if (!currentPiece) return;
+            if (!currentPiece || isGrabbing) return; // Don't drop if holding
+            
             if (isValidMove(currentPiece, { y: 1 })) {
-                currentPiece.userData.gridPos.y += 1;
-                updatePiecePosition(currentPiece);
+                currentPiece.userData.gridPos.y++;
+                updatePieceVisuals();
             } else {
                 lockPiece();
-                spawnPiece();
             }
-        }
-        
-        function gameOver() {
-            clearInterval(gameLoopInterval);
-            gameState = GAME_STATE.GAME_OVER;
-            
-            goScore.textContent = score;
-            goLevel.textContent = level;
-            gameOverCard.style.display = 'flex';
-            
-            if (bgmLoop) bgmLoop.pause();
-            playSound(gameOverSound);
-        }
-
-        function resetGame() {
-            gameOverCard.style.display = 'none';
-            
-            for (let i = gameBoard.children.length - 1; i >= 0; i--) {
-                const child = gameBoard.children[i];
-                gameBoard.remove(child);
-            }
-            scene.remove(gameBoard); 
-            gameBoard = new THREE.Group(); 
-
-            grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
-            score = 0;
-            
-            linesClearedTotal = 0;
-            level = 1;
-            currentDropSpeed = 1000;
-            
-            hudPanel.style.opacity = '0';
-
-            if (bgmLoop && !isMusicMuted) {
-                bgmLoop.currentTime = 0;
-                bgmLoop.play().catch(e => console.error("BGM restart failed:", e));
-            }
-
-            gameState = GAME_STATE.SCANNING;
-            updateMessage("Scan floor to start", true);
-            placementGrid.visible = false; 
-        }
-
-        function updateScore(linesCleared) {
-            if (linesCleared > 0) {
-                const points = { 1: 100, 2: 300, 3: 500, 4: 800 };
-                score += points[linesCleared] || 0;
-                
-                linesClearedTotal += linesCleared;
-                const newLevel = Math.floor(linesClearedTotal / 5) + 1; 
-                
-                if (newLevel > level) {
-                    level = newLevel;
-                    levelBox.textContent = `Level: ${level}`;
-                    currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
-                    
-                    clearInterval(gameLoopInterval);
-                    gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-                }
-
-                playSound(lineClearSound);
-                const flash = document.createElement('div');
-                flash.style.position = 'absolute';
-                flash.style.top = '0';
-                flash.style.left = '0';
-                flash.style.width = '100%';
-                flash.style.height = '100%';
-                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
-                flash.style.zIndex = '999';
-                flash.style.pointerEvents = 'none'; 
-                document.body.appendChild(flash);
-                setTimeout(() => document.body.removeChild(flash), 100);
-            }
-            scoreVal.textContent = score;
-            levelVal.textContent = level;
-        }
-        
-        function checkLineClears() {
-            let linesCleared = 0;
-            let rowsToClear = [];
-            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
-                if (grid[y].every(cell => cell > 0)) {
-                    linesCleared++;
-                    rowsToClear.push(y);
-                }
-            }
-            
-            if (linesCleared > 0) {
-                clearInterval(gameLoopInterval);
-
-                const blocksToAnimate = [];
-                gameBoard.children.forEach(block => {
-                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                    if (rowsToClear.includes(blockY)) {
-                        blocksToAnimate.push(block);
-                    }
-                });
-
-                let progress = 0;
-                const duration = 1000; 
-                const startTime = Date.now();
-
-                function animateClear() {
-                    const now = Date.now();
-                    progress = (now - startTime) / duration;
-
-                    if (progress < 1) {
-                        blocksToAnimate.forEach(b => {
-                            b.scale.setScalar(1 - progress);
-                            b.rotation.y += 0.2; 
-                            b.rotation.z += 0.1;
-                        });
-                        requestAnimationFrame(animateClear);
-                    } else {
-                        gameBoard.children = gameBoard.children.filter(block => {
-                            if (block === currentPiece) return true; 
-                            const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                            return !rowsToClear.includes(blockY); 
-                        });
-                        
-                        for (const y of rowsToClear.sort((a, b) => a - b)) { 
-                            grid.splice(y, 1);
-                            grid.unshift(Array(BOARD_WIDTH).fill(0));
-                        }
-                        
-                        gameBoard.children.forEach(block => {
-                            if (block === currentPiece) return; 
-                            const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                            let shift = 0;
-                            for (const clearedY of rowsToClear) {
-                                if (blockY < clearedY) shift++;
-                            }
-                            if (shift > 0) block.position.y -= shift * BLOCK_SIZE;
-                        });
-                        
-                        updateScore(linesCleared);
-                        
-                        gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-                    }
-                }
-                animateClear();
-            }
-        }
-
-        function movePiece(direction) {
-            if (!currentPiece) return;
-            if (isValidMove(currentPiece, { x: direction })) {
-                currentPiece.userData.gridPos.x += direction;
-                updatePiecePosition(currentPiece);
-                triggerHaptic(5); 
-            }
-        }
-        
-        function updatePiecePosition(piece) {
-            const ud = piece.userData;
-            piece.position.set(
-                (ud.gridPos.x - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
-                (BOARD_HEIGHT / 2 - 0.5 - ud.gridPos.y) * BLOCK_SIZE,
-                0 
-            );
         }
 
         function spawnPiece() {
-            const typeIndex = Math.floor(Math.random() * SHAPES.length);
-            const rotationIndex = 0; 
-            const shape = SHAPES[typeIndex][rotationIndex];
-            const color = COLORS[typeIndex + 1];
-            
-            const piece = new THREE.Group();
-            piece.userData = { shape: shape, typeIndex: typeIndex, rotationIndex: rotationIndex, gridPos: { x: Math.floor((BOARD_WIDTH - shape[0].length) / 2), y: 0 } };
-            
-            const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-            const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-            const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-            const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-            
-            for (let y = 0; y < shape.length; y++) {
-                for (let x = 0; x < shape[y].length; x++) {
-                    if (shape[y][x]) {
-                        const block = new THREE.Mesh(blockGeo, blockMat);
-                        const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                        block.add( bevel );
-                        block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
-                        piece.add(block);
+            const typeId = Math.floor(Math.random() * SHAPES.length);
+            const shape = SHAPES[typeId][0]; // Initial rotation
+            const color = COLORS[typeId];
+
+            const group = new THREE.Group();
+            group.userData = {
+                shape: shape,
+                typeId: typeId,
+                rotId: 0,
+                gridPos: { x: Math.floor(BOARD_W/2)-1, y: 0 }
+            };
+
+            // Create blocks
+            const geo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: color, 
+                roughness: 0.2, 
+                metalness: 0.1,
+                transparent: true, opacity: 0.9
+            });
+            const edgeGeo = new THREE.EdgesGeometry(geo);
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+
+            shape.forEach((row, y) => {
+                row.forEach((val, x) => {
+                    if (val) {
+                        const m = new THREE.Mesh(geo, mat);
+                        m.add(new THREE.LineSegments(edgeGeo, edgeMat));
+                        // Local pos in piece group
+                        m.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
+                        group.add(m);
                     }
-                }
+                });
+            });
+
+            gameBoard.add(group);
+            currentPiece = group;
+            updatePieceVisuals();
+
+            if (!isValidMove(currentPiece, {})) {
+                gameOver();
             }
-            updatePiecePosition(piece);
-            gameBoard.add(piece);
-            currentPiece = piece;
-            if (!isValidMove(currentPiece, {})) gameOver();
         }
-        
-        function rotatePiece() {
+
+        function updatePieceVisuals() {
             if (!currentPiece) return;
             const ud = currentPiece.userData;
-            const newRotationIndex = (ud.rotationIndex + 1) % SHAPES[ud.typeIndex].length;
-            const newShape = SHAPES[ud.typeIndex][newRotationIndex];
-            const kicks = [0, 1, -1, 2, -2]; 
-            for (const kick of kicks) {
-                const testPos = { x: ud.gridPos.x + kick, y: ud.gridPos.y };
-                if (isValidMove(currentPiece, { shape: newShape, pos: testPos })) {
-                    ud.rotationIndex = newRotationIndex;
-                    ud.shape = newShape;
-                    ud.gridPos.x = testPos.x; 
-                    while (currentPiece.children.length) currentPiece.remove(currentPiece.children[0]);
-                    
-                    const color = COLORS[ud.typeIndex + 1];
-                    const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-                    const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-                    const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-                    const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+            const x = (ud.gridPos.x - BOARD_W/2 + 0.5) * BLOCK_SIZE;
+            const y = (BOARD_H/2 - 0.5 - ud.gridPos.y) * BLOCK_SIZE;
+            currentPiece.position.set(x, y, 0);
+        }
+
+        function lockPiece() {
+            if(!currentPiece) return;
+            const ud = currentPiece.userData;
+            const shape = ud.shape;
             
-                    for (let y = 0; y < newShape.length; y++) {
-                        for (let x = 0; x < newShape[y].length; x++) {
-                            if (newShape[y][x]) {
-                                const block = new THREE.Mesh(blockGeo, blockMat);
-                                const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                                block.add(bevel);
-                                block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
-                                currentPiece.add(block);
+            const pieceX = ud.gridPos.x;
+            const pieceY = ud.gridPos.y;
+
+            shape.forEach((row, ry) => {
+                row.forEach((val, rx) => {
+                    if (val) {
+                        const gx = pieceX + rx;
+                        const gy = pieceY + ry;
+                        if (gy >= 0 && gy < BOARD_H && gx >= 0 && gx < BOARD_W) {
+                            grid[gy][gx] = 1; // Occupied
+                            
+                            // Recreate mesh at static position
+                            const oldBlock = currentPiece.children.find(b => 
+                                Math.abs(b.position.x - rx*BLOCK_SIZE) < 0.001 && 
+                                Math.abs(b.position.y - (-ry*BLOCK_SIZE)) < 0.001
+                            );
+                            
+                            if (oldBlock) {
+                                const newBlock = oldBlock.clone();
+                                newBlock.position.set(
+                                    (gx - BOARD_W/2 + 0.5) * BLOCK_SIZE,
+                                    (BOARD_H/2 - 0.5 - gy) * BLOCK_SIZE,
+                                    0
+                                );
+                                gameBoard.add(newBlock);
                             }
                         }
                     }
-                    updatePiecePosition(currentPiece);
-                    triggerHaptic(5); 
-                    playSound(rotateSound);
-                    return; 
+                });
+            });
+
+            gameBoard.remove(currentPiece);
+            currentPiece = null;
+            playSynthSound(200, 'square', 0.1); // Thud
+            
+            checkLines();
+            spawnPiece();
+        }
+
+        function checkLines() {
+            let cleared = 0;
+            for (let y = BOARD_H-1; y >= 0; y--) {
+                if (grid[y].every(v => v !== 0)) {
+                    cleared++;
+                    grid.splice(y, 1);
+                    grid.unshift(Array(BOARD_W).fill(0));
+                    y++; 
                 }
             }
-        }
-        
-        function hardDrop() {
-            if (!currentPiece) return;
-            while (isValidMove(currentPiece, { y: 1 })) {
-                currentPiece.userData.gridPos.y += 1;
+
+            if (cleared > 0) {
+                // Rebuild entire visual board
+                for(let i=gameBoard.children.length-1; i>=0; i--){
+                    if(gameBoard.children[i] !== currentPiece && gameBoard.children[i] !== ghostPiece) {
+                        gameBoard.remove(gameBoard.children[i]);
+                    }
+                }
+                const geo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                const edgeGeo = new THREE.EdgesGeometry(geo);
+                
+                grid.forEach((row, gy) => {
+                    row.forEach((val, gx) => {
+                        if (val) {
+                            const mat = new THREE.MeshStandardMaterial({ color: 0x888888 }); 
+                            const m = new THREE.Mesh(geo, mat);
+                            m.add(new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({color:0})));
+                            m.position.set(
+                                (gx - BOARD_W/2 + 0.5) * BLOCK_SIZE,
+                                (BOARD_H/2 - 0.5 - gy) * BLOCK_SIZE,
+                                0
+                            );
+                            gameBoard.add(m);
+                        }
+                    });
+                });
+
+                playSynthSound(600 + (cleared*100), 'sine', 0.3);
+                updateScore(cleared);
             }
-            updatePiecePosition(currentPiece);
-            lockPiece();
-            spawnPiece();
-            clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
-            triggerHaptic(20); 
         }
 
         function isValidMove(piece, delta) {
             const ud = piece.userData;
             const shape = delta.shape || ud.shape;
-            const newGridX = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
-            const newGridY = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
+            const px = (delta.pos ? delta.pos.x : ud.gridPos.x) + (delta.x || 0);
+            const py = (delta.pos ? delta.pos.y : ud.gridPos.y) + (delta.y || 0);
 
-            for (let y = 0; y < shape.length; y++) {
-                for (let x = 0; x < shape[y].length; x++) {
-                    if (shape[y][x]) {
-                        const boardX = newGridX + x;
-                        const boardY = newGridY + y; 
-                        if (boardX < 0 || boardX >= BOARD_WIDTH) return false;
-                        if (boardY >= BOARD_HEIGHT) return false;
-                        if (boardY >= 0 && grid[boardY][boardX]) return false;
+            for(let y=0; y<shape.length; y++){
+                for(let x=0; x<shape[y].length; x++){
+                    if(shape[y][x]){
+                        const gx = px + x;
+                        const gy = py + y;
+                        if (gx < 0 || gx >= BOARD_W || gy >= BOARD_H) return false;
+                        if (gy >= 0 && grid[gy][gx]) return false;
                     }
                 }
             }
             return true;
         }
 
-        function lockPiece() {
-            if (!currentPiece) return;
+        function rotatePiece() {
+            if(!currentPiece) return;
             const ud = currentPiece.userData;
-            const shape = ud.shape;
-            const gridX = ud.gridPos.x;
-            const gridY = ud.gridPos.y; 
-            for (let y = 0; y < shape.length; y++) {
-                for (let x = 0; x < shape[y].length; x++) {
-                    if (shape[y][x]) {
-                        const boardX = gridX + x;
-                        const boardY = gridY + y;
-                        if (boardY < 0 || boardY >= BOARD_HEIGHT) continue; 
-                        grid[boardY][boardX] = ud.typeIndex + 1;
-                        
-                        const color = COLORS[ud.typeIndex + 1];
-                        const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-                        const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-                        const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-                        const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-                        const newBlock = new THREE.Mesh(blockGeo, blockMat);
-                        const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                        newBlock.add(newBevel);
-                        
-                        newBlock.position.set(
-                            (boardX - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
-                            (BOARD_HEIGHT / 2 - 0.5 - boardY) * BLOCK_SIZE,
-                            0
-                        );
-                        gameBoard.add(newBlock);
-                    }
+            const curShape = ud.shape;
+            
+            const N = curShape.length;
+            const M = curShape[0].length;
+            const newShape = Array(M).fill().map(()=>Array(N).fill(0));
+            for(let y=0; y<N; y++){
+                for(let x=0; x<M; x++){
+                    newShape[x][N-1-y] = curShape[y][x];
                 }
             }
-            gameBoard.remove(currentPiece);
-            currentPiece = null;
-            checkLineClears();
+
+            if(isValidMove(currentPiece, {shape: newShape})){
+                ud.shape = newShape;
+                while(currentPiece.children.length) currentPiece.remove(currentPiece.children[0]);
+                
+                const geo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                const mat = new THREE.MeshStandardMaterial({ color: COLORS[ud.typeId], roughness:0.2 });
+                const edgeGeo = new THREE.EdgesGeometry(geo);
+                
+                newShape.forEach((row, y) => {
+                    row.forEach((val, x) => {
+                        if(val){
+                            const m = new THREE.Mesh(geo, mat);
+                            m.add(new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({color:0})));
+                            m.position.set(x*BLOCK_SIZE, -y*BLOCK_SIZE, 0);
+                            currentPiece.add(m);
+                        }
+                    });
+                });
+            }
         }
 
-        function base64ToArrayBuffer(base64) {
-            const binaryString = window.atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-            return bytes.buffer;
+        function gameOver() {
+            clearInterval(gameLoopInterval);
+            gameState = 4;
+            document.getElementById('go-score').innerText = score;
+            document.getElementById('go-level').innerText = level;
+            ui.gameOver.style.display = 'flex';
         }
 
-        function pcmToWav(pcmData, sampleRate) {
-            const numChannels = 1;
-            const bitsPerSample = 16;
-            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-            const blockAlign = numChannels * bitsPerSample / 8;
-            const dataSize = pcmData.length * 2; 
-            const buffer = new ArrayBuffer(44 + dataSize);
-            const view = new DataView(buffer);
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + dataSize, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true); 
-            view.setUint16(20, 1, true); 
-            view.setUint16(22, numChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, bitsPerSample, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, dataSize, true);
-            for (let i = 0; i < pcmData.length; i++) view.setInt16(44 + i * 2, pcmData[i], true);
-            return new Blob([view], { type: 'audio/wav' });
+        function resetGame() {
+            grid = Array(BOARD_H).fill().map(()=>Array(BOARD_W).fill(0));
+            // Clear board
+            while(gameBoard.children.length) gameBoard.remove(gameBoard.children[0]);
+            // Re-add ghost piece which was removed
+            gameBoard.add(ghostPiece);
+            ghostPiece.visible = false;
+            
+            ui.gameOver.style.display = 'none';
+            startGame();
         }
 
-        function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+        function updateScore(lines) {
+            score += lines * 100 * level;
+            linesClearedTotal += lines;
+            level = Math.floor(linesClearedTotal / 5) + 1;
+            ui.score.innerText = score;
+            ui.level.innerText = level;
+            currentDropSpeed = Math.max(100, 1000 - (level*50));
         }
-    </script></body>
+
+        // --- INPUT HANDLERS ---
+        function handleKey(e) {
+            if(gameState !== 3 || isGrabbing) return;
+            if(e.key === 'ArrowLeft') move(-1);
+            if(e.key === 'ArrowRight') move(1);
+            if(e.key === 'ArrowDown') gameTick();
+            if(e.code === 'Space') rotatePiece();
+        }
+
+        function move(dir) {
+            if(isValidMove(currentPiece, {x: dir})){
+                currentPiece.userData.gridPos.x += dir;
+                updatePieceVisuals();
+            }
+        }
+
+        // --- TOUCH ---
+        function setupTouch() {
+            let tx=0, ty=0;
+            window.addEventListener('touchstart', e => { tx=e.touches[0].clientX; ty=e.touches[0].clientY; });
+            window.addEventListener('touchend', e => {
+                if(gameState !== 3) return;
+                const dx = e.changedTouches[0].clientX - tx;
+                const dy = e.changedTouches[0].clientY - ty;
+                if(Math.abs(dx) > Math.abs(dy)) {
+                    if(Math.abs(dx) > 30) move(dx>0?1:-1);
+                } else {
+                    if(dy > 30) gameTick(); // Swipe Down
+                    else if(dy < -30) rotatePiece(); // Swipe Up
+                }
+            });
+        }
+
+        // --- AUDIO SYSTEM (Web Audio API) ---
+        function setupAudio() {
+            // Unlocking is handled on user click
+        }
+        function unlockAudio() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        // Synthesizer for SFX (No files needed)
+        function playSynthSound(freq, type, duration) {
+            if(audioCtx.state === 'suspended') return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        // --- RECORDING ---
+        function toggleRecord() {
+            if(isRecording) {
+                mediaRecorder.stop();
+                ui.recBtn.classList.remove('recording');
+                ui.recPanel.style.display = 'none';
+                clearInterval(recTimerInt);
+                isRecording = false;
+            } else {
+                const stream = renderer.domElement.captureStream(30);
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                recordedChunks = [];
+                mediaRecorder.ondataavailable = e => { if(e.data.size>0) recordedChunks.push(e.data); };
+                mediaRecorder.onstop = saveVideo;
+                mediaRecorder.start();
+                
+                isRecording = true;
+                ui.recBtn.classList.add('recording');
+                ui.recPanel.style.display = 'flex';
+                let s = 0;
+                recTimerInt = setInterval(() => {
+                    s++;
+                    const min = Math.floor(s/60).toString().padStart(2,'0');
+                    const sec = (s%60).toString().padStart(2,'0');
+                    ui.recTime.innerText = `${min}:${sec}`;
+                }, 1000);
+            }
+        }
+
+        function saveVideo() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'immersive-tetris.webm';
+            a.click();
+        }
+
+    </script>
+</body>
 </html>
 
 

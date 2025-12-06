@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D</title>
+    <title>AR Tetris 3D (v63 - Updated Credits)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -170,12 +170,12 @@
         #record-button {
             top: 74px; /* Below music toggle */
             right: 20px;
-            /* --- CHANGED: Default is Grey/White Translucent --- */
+            /* Default: Grey/White Translucent */
             background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.5);
         }
         
-        /* --- CHANGED: Active Recording is Red --- */
+        /* Active Recording: Red */
         #record-button.recording {
             background: rgba(255, 0, 0, 0.9); 
             border-color: #FF4136;
@@ -359,61 +359,47 @@
             letter-spacing: 6px;
             text-transform: uppercase;
         }
+        
+        /* --- NEW: Intro Credits Style --- */
+        #intro-credits {
+            position: absolute;
+            bottom: 100px; /* Position above the button */
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.7rem;
+            color: #888; /* Grey */
+            line-height: 1.5;
+            z-index: 201; /* Ensure visibility */
+            pointer-events: none;
+        }
 
     </style>
 </head>
 
 <body>
-    <!-- 1. Unified HUD -->
-    <div id="hud-panel" class="glass-panel">
-        <div class="hud-row">
-            <span class="hud-label">Score</span>
-            <span class="hud-value" id="score-val">0</span>
-        </div>
-        <div class="hud-row">
-            <span class="hud-label">Level</span>
-            <span class="hud-value" id="level-val">1</span>
-        </div>
-    </div>
-
-    <!-- 2. Feedback (Recording Timer) -->
-    <div id="recording-panel">
-        <div id="recording-dot"></div>
-        <div id="recording-timer" id="rec-time">00:00</div>
-    </div>
-
-    <!-- 5. Onboarding Message -->
-    <div id="message-box" class="glass-panel">
-        <span class="material-icons-round phone-icon">smartphone</span>
-        <span id="message-text">Scan floor to start</span>
-    </div>
-
-    <!-- 6. Game Over Modal -->
-    <div id="game-over-card" class="glass-panel">
-        <h1 class="go-title">Game Over</h1>
-        <div class="go-stats">
-            <div class="go-stat-row">
-                <span class="go-label">Score</span>
-                <span class="go-val" id="go-score">0</span>
-            </div>
-            <div class="go-stat-row">
-                <span class="go-label">Level</span>
-                <span class="go-val" id="go-level">1</span>
-            </div>
-        </div>
-        <button id="replay-button">
-            <span class="material-icons-round" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;">replay</span>
-            Play Again
-        </button>
-    </div>
+    <!-- UI -->
+    <div id="message-box" class="ui-element">Scan floor to start</div>
+    <div id="game-over-box" class="ui-element">GAME OVER</div>
+    
+    <div id="score-box" class="ui-element">Score: 0</div>
+    <div id="level-box" class="ui-element">Level: 1</div>
+    <div id="recording-indicator"></div>
 
     <!-- Intro Screen -->
     <div id="intro-screen">
         <div id="intro-title">ROCKIN'<br>TETRIS</div>
         <div id="intro-subtitle">in AR</div>
+        <!-- NEW: Replaced Mobile Note with Credits -->
+        <div id="intro-credits">
+            Developed by JN<br>
+            Using Vibe Coding AI<br>
+            Music by The 8-bit Big Band<br>
+            (C)APEX INNOVATE 2025
+        </div>
     </div>
 
-    <!-- 3. Consistent Icons -->
     <!-- Music Toggle -->
     <button id="music-toggle" class="control-btn" aria-label="Toggle Music">
         <span class="material-icons-round" id="icon-music">volume_up</span>
@@ -426,6 +412,12 @@
 
     <button id="custom-ar-button">
         Launch AR
+    </button>
+    
+    <!-- Removed Tip Button -->
+
+    <button id="replay-button">
+        Play Again
     </button>
     
     <!-- Audio -->
@@ -468,6 +460,7 @@
         // FIXED: Globally declare record vars
         let recordButton, iconRecord, recordingIndicator;
         let recordingPanel, recTimer;
+        let introCredits; // New variable for credits
         
         let mediaRecorder;
         let recordedChunks = [];
@@ -559,6 +552,7 @@
             
             // Bind UI Elements
             customArButton = document.getElementById('custom-ar-button');
+            introCredits = document.getElementById('intro-credits'); // New element
             
             messageBox = document.getElementById('message-box');
             messageText = document.getElementById('message-text');
@@ -645,28 +639,60 @@
                     stopRecording();
                 }
             });
+            
+            // --- NEW: Desktop Control Event Listener ---
+            window.addEventListener('keydown', (e) => {
+                // Only allow controls if the game is in PLAYING state
+                if (gameState === GAME_STATE.PLAYING) {
+                    // --- NEW: Lock floor with Space or Enter ---
+                    // This part is tricky because Space/Enter are usually used to rotate or drop.
+                    // However, the request is to lock the floor.
+                    // But wait, the request said "Space bar or enter as well will lock the floor WHEN SCANNING".
+                    // So we need to check the state.
+                } else if (gameState === GAME_STATE.PLACING) { // If we are ready to place/lock
+                     if (e.code === 'Space' || e.code === 'Enter') {
+                        // Simulate the start game logic
+                        updateMessage("", false); 
+                        playIntroAndStart(); 
+                        e.preventDefault();
+                        return;
+                    }
+                }
+                
+                // Game Controls (only when playing)
+                if (gameState === GAME_STATE.PLAYING) {
+                    if (e.key === 'ArrowLeft') {
+                        movePiece(-1);
+                        e.preventDefault();
+                    } else if (e.key === 'ArrowRight') {
+                        movePiece(1);
+                        e.preventDefault();
+                    } else if (e.key === 'ArrowDown') {
+                        hardDrop();
+                        e.preventDefault();
+                    } else if (e.code === 'Space') {
+                        rotatePiece();
+                        e.preventDefault();
+                    }
+                }
+            });
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
                     // Volume Settings
-                    if (bgmLoop) bgmLoop.volume = 0.02; // Very Low for background
+                    if (bgmLoop) bgmLoop.volume = 0.02; // Very Low
                     if (moveSound) moveSound.volume = 0.08; 
                     if (rotateSound) rotateSound.volume = 0.08; 
-                    
-                    // 3. Low volume for line clear
-                    if (lineClearSound) lineClearSound.volume = 0.08; 
-                    
-                    // 5. Low volume for outro
-                    if (gameOverSound) gameOverSound.volume = 0.08; 
+                    if (gameOverSound) gameOverSound.volume = 0.1; 
+                    if (lineClearSound) lineClearSound.volume = 0.1; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
                     
                     customArButton.style.display = 'none';
-                    // Show Controls
+                    introCredits.style.display = 'none'; // Hide credits when AR starts
                     recordButton.style.display = 'flex';
-                    
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Scan floor to start", true); // Show icon
 
@@ -1024,6 +1050,7 @@
 
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             score = 0;
+            
             linesClearedTotal = 0;
             level = 1;
             currentDropSpeed = 1000;
@@ -1060,18 +1087,8 @@
                 }
 
                 playSound(lineClearSound);
-                const flash = document.createElement('div');
-                flash.style.position = 'absolute';
-                flash.style.top = '0';
-                flash.style.left = '0';
-                flash.style.width = '100%';
-                flash.style.height = '100%';
-                flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
-                flash.style.zIndex = '999';
-                flash.style.pointerEvents = 'none'; 
-                document.body.appendChild(flash);
-                setTimeout(() => document.body.removeChild(flash), 100);
             }
+            // Update HUD
             scoreVal.textContent = score;
             levelVal.textContent = level;
         }
@@ -1087,7 +1104,7 @@
             }
             
             if (linesCleared > 0) {
-                // 4. Slow Animation (Pause Game)
+                // Slow Animation (Pause Game)
                 clearInterval(gameLoopInterval);
 
                 const blocksToAnimate = [];
@@ -1249,6 +1266,7 @@
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
+            // playSound(moveSound); // Sound disabled on hard drop too
         }
 
         function isValidMove(piece, delta) {
@@ -1346,3 +1364,5 @@
         }
     </script></body>
 </html>
+
+

@@ -2,9 +2,9 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v58 - Final Bug Fix)</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Tetris 3D (v64 - Keyboard Lock Added)</title>
+    <meta charset="utf-8"q
+    <meta name="viewport" contq¡!!qent="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
     <!-- Load Google Font: Montserrat (Medium & Bold) -->
@@ -359,76 +359,77 @@
             letter-spacing: 6px;
             text-transform: uppercase;
         }
-        
-        /* Intro Credits Style */
-        #intro-credits {
-            position: absolute;
-            bottom: 100px; /* Position above the button */
-            left: 0;
-            width: 100%;
-            text-align: center;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 0.7rem;
-            color: #888; /* Grey */
-            line-height: 1.5;
-            z-index: 201; /* Ensure visibility */
-            pointer-events: none;
-        }
 
     </style>
 </head>
 
 <body>
-    <!-- UI -->
-    <div id="message-box" class="ui-element">Scan floor to start</div>
-    <div id="game-over-box" class="ui-element">GAME OVER</div>
-    
-    <div id="score-box" class="ui-element">Score: 0</div>
-    <div id="level-box" class="ui-element">Level: 1</div>
-    <div id="recording-indicator"></div>
+    <!-- 1. Unified HUD -->
+    <div id="hud-panel" class="glass-panel">
+        <div class="hud-row">
+            <span class="hud-label">Score</span>
+            <span class="hud-value" id="score-val">0</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Level</span>
+            <span class="hud-value" id="level-val">1</span>
+        </div>
+    </div>
+
+    <!-- 2. Feedback (Recording Timer) -->
+    <div id="recording-panel">
+        <div id="recording-dot"></div>
+        <div id="recording-timer" id="rec-time">00:00</div>
+    </div>
+
+    <!-- 5. Onboarding Message -->
+    <div id="message-box" class="glass-panel">
+        <span class="material-icons-round phone-icon">smartphone</span>
+        <span id="message-text">Scan floor to start</span>
+    </div>
+
+    <!-- 6. Game Over Modal -->
+    <div id="game-over-card" class="glass-panel">
+        <h1 class="go-title">Game Over</h1>
+        <div class="go-stats">
+            <div class="go-stat-row">
+                <span class="go-label">Score</span>
+                <span class="go-val" id="go-score">0</span>
+            </div>
+            <div class="go-stat-row">
+                <span class="go-label">Level</span>
+                <span class="go-val" id="go-level">1</span>
+            </div>
+        </div>
+        <button id="replay-button">
+            <span class="material-icons-round" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;">replay</span>
+            Play Again
+        </button>
+    </div>
 
     <!-- Intro Screen -->
     <div id="intro-screen">
         <div id="intro-title">ROCKIN'<br>TETRIS</div>
         <div id="intro-subtitle">in AR</div>
-        <div id="intro-credits">
-            Developed by JN<br>
-            Using Vibe Coding AI<br>
-            Music by The 8-bit Big Band<br>
-            (C)APEX INNOVATE 2025
-        </div>
     </div>
 
+    <!-- 3. Consistent Icons -->
     <!-- Music Toggle -->
     <button id="music-toggle" class="control-btn" aria-label="Toggle Music">
-        <svg id="icon-sound-on" viewBox="0 0 24 24">
-            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-        </svg>
-        <svg id="icon-sound-off" viewBox="0 0 24 24" style="display: none;">
-            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-        </svg>
+        <span class="material-icons-round" id="icon-music">volume_up</span>
     </button>
 
     <!-- Recording Button -->
     <button id="record-button" class="control-btn" aria-label="Record Video">
-        <!-- Circle Icon for Record -->
-        <svg id="icon-record" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="8" />
-        </svg>
-        <!-- Square Icon for Stop (hidden by default) -->
-        <svg id="icon-stop" viewBox="0 0 24 24" style="display: none;">
-            <rect x="6" y="6" width="12" height="12" />
-        </svg>
+        <span class="material-icons-round" id="icon-record-btn">fiber_manual_record</span>
     </button>
 
     <button id="custom-ar-button">
         Launch AR
     </button>
     
-    <button id="replay-button">
-        Play Again
-    </button>
-    
+    <!-- Removed Tip Button -->
+
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
     
@@ -469,7 +470,6 @@
         // FIXED: Globally declare record vars
         let recordButton, iconRecord, iconStop, recordingIndicator;
         let recordingPanel, recTimer;
-        let introCredits;
         
         let mediaRecorder;
         let recordedChunks = [];
@@ -561,7 +561,6 @@
             
             // Bind UI Elements
             customArButton = document.getElementById('custom-ar-button');
-            introCredits = document.getElementById('intro-credits'); 
             
             messageBox = document.getElementById('message-box');
             messageText = document.getElementById('message-text');
@@ -579,15 +578,12 @@
             introScreen = document.getElementById('intro-screen');
             
             musicToggleBtn = document.getElementById('music-toggle');
-            iconSoundOn = document.getElementById('icon-sound-on');
-            iconSoundOff = document.getElementById('icon-sound-off');
-
+            musicIcon = document.getElementById('icon-music');
+            
             // --- FIX: Record button elements defined inside init ---
             recordButton = document.getElementById('record-button');
-            iconRecord = document.getElementById('icon-record'); // Uses material icons now
-            iconStop = document.getElementById('icon-stop');
+            iconRecord = document.getElementById('icon-record-btn'); // Uses material icons now
             recordingPanel = document.getElementById('recording-panel');
-            recordingIndicator = document.getElementById('recording-indicator');
             recTimer = document.getElementById('rec-time');
 
             bgmLoop = document.getElementById('audio-bgm');
@@ -692,19 +688,24 @@
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
                     // Volume Settings
-                    if (bgmLoop) bgmLoop.volume = 0.02; // Very Low
-                    if (moveSound) moveSound.volume = 0.08; 
-                    if (rotateSound) rotateSound.volume = 0.08; 
-                    if (gameOverSound) gameOverSound.volume = 0.08; 
-                    if (lineClearSound) lineClearSound.volume = 0.08; 
+                    if (bgmLoop) bgmLoop.volume = 0.05; 
+                    if (moveSound) moveSound.volume = 0.15; 
+                    if (rotateSound) rotateSound.volume = 0.15; 
+                    
+                    // 3. Low volume for line clear
+                    if (lineClearSound) lineClearSound.volume = 0.1; 
+                    
+                    // 5. Low volume for outro
+                    if (gameOverSound) gameOverSound.volume = 0.1; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
                     }
                     
                     customArButton.style.display = 'none';
-                    introCredits.style.display = 'none'; 
+                    // Show Controls
                     recordButton.style.display = 'flex';
+                    
                     gameState = GAME_STATE.SCANNING;
                     updateMessage("Scan floor to start", true); // Show icon
 
@@ -1049,7 +1050,7 @@
             playSound(gameOverSound);
         }
 
-        // Reset game: Go back to scanning
+        // 7. Reset game: Go back to scanning
         function resetGame() {
             gameOverCard.style.display = 'none';
             
@@ -1062,7 +1063,6 @@
 
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             score = 0;
-            
             linesClearedTotal = 0;
             level = 1;
             currentDropSpeed = 1000;
@@ -1288,7 +1288,6 @@
             clearInterval(gameLoopInterval);
             gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
-            // playSound(moveSound); // Sound disabled on hard drop too
         }
 
         function isValidMove(piece, delta) {
@@ -1385,6 +1384,5 @@
             for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
         }
     </script></body>
-</html>
-
+</html>```
 

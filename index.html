@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>AR/VR Tetris 3D</title>
+    <title>AR Tetris 3D (Quest Ready)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
@@ -170,12 +170,12 @@
         #record-button {
             top: 74px; /* Below music toggle */
             right: 20px;
-            /* --- CHANGED: Default is Grey/White Translucent --- */
+            /* Default is Grey/White Translucent */
             background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.5);
         }
         
-        /* --- CHANGED: Active Recording is Red --- */
+        /* Active Recording is Red */
         #record-button.recording {
             background: rgba(255, 0, 0, 0.9); 
             border-color: #FF4136;
@@ -252,6 +252,23 @@
 
         #custom-ar-button:active {
             transform: translateX(-50%) scale(0.95);
+        }
+
+        /* --- Device Note Above Button --- */
+        #device-note {
+            position: absolute;
+            bottom: 110px; /* Positioned above the button */
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.75rem;
+            font-family: 'Montserrat', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            pointer-events: none;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            z-index: 101;
+            white-space: nowrap;
         }
 
         /* Game Over Modal */
@@ -424,8 +441,10 @@
         <span class="material-icons-round" id="icon-record-btn">fiber_manual_record</span>
     </button>
 
+    <!-- Device Note & Main Launch Button -->
+    <div id="device-note">Mobile and Meta Quest only</div>
     <button id="custom-ar-button">
-        Launch AR
+        LAUNCH AR/VR
     </button>
     
     <!-- Audio -->
@@ -433,6 +452,7 @@
     
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
+    <!-- Rotate Sound Removed: We now synthesize it for zero latency -->
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
     <!-- TOOT Sound -->
@@ -462,7 +482,7 @@
         let gameLoopInterval = null;
         
         // UI Vars
-        let customArButton, messageBox, messageText, phoneIcon;
+        let customArButton, messageBox, messageText, phoneIcon, deviceNote;
         let hudPanel, scoreVal, levelVal;
         let gameOverCard, goScore, goLevel, replayButton;
         let musicToggleBtn, musicIcon;
@@ -514,7 +534,7 @@
             1: 0x00F0F0, 2: 0xF0F000, 3: 0xA000F0, 4: 0x00F000, 5: 0xF00000, 6: 0x0000F0, 7: 0xF0A000,
         };
 
-        let moveSound, rotateSound, gameOverSound, bgmLoop, lineClearSound;
+        let moveSound, gameOverSound, bgmLoop, lineClearSound;
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let audioUnlocked = false;
         let isMusicMuted = false; 
@@ -545,6 +565,41 @@
                     }
                 }
             }
+        }
+
+        // --- NEW: SYNTHESIZED "AIRY WOOF" SOUND ---
+        // This plays directly from the audio context for zero latency
+        function playRotateSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            // 1. "Smooth/Airy" Waveform
+            osc.type = 'sine'; 
+            
+            // 2. Frequency: Lowered by 30% (approx 150Hz starting, dropping to 100Hz)
+            // This creates the "Woof" body
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
+
+            // 3. Filter: Low-pass to make it muffled/airy, removing harsh highs
+            filter.type = 'lowpass';
+            filter.frequency.value = 400;
+
+            // 4. Volume: Lowered and Smooth Envelope
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.02); // Soft attack (no click)
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15); // Quick decay
+
+            // Connect graph
+            osc.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.2);
         }
 
         function playToot() {
@@ -592,6 +647,7 @@
 
             // Bind UI Elements
             customArButton = document.getElementById('custom-ar-button');
+            deviceNote = document.getElementById('device-note');
             
             messageBox = document.getElementById('message-box');
             messageText = document.getElementById('message-text');
@@ -619,7 +675,6 @@
 
             bgmLoop = document.getElementById('audio-bgm');
             moveSound = document.getElementById('audio-move');
-            rotateSound = document.getElementById('audio-move'); 
             gameOverSound = document.getElementById('audio-gameover');
             lineClearSound = document.getElementById('audio-lineclear');
 
@@ -684,7 +739,6 @@
                     // Volume Settings
                     if (bgmLoop) bgmLoop.volume = 0.02; // Very Low for background
                     if (moveSound) moveSound.volume = 0.08; 
-                    if (rotateSound) rotateSound.volume = 0.08; 
                     
                     // 3. Low volume for line clear
                     if (lineClearSound) lineClearSound.volume = 0.08; 
@@ -697,6 +751,7 @@
                     }
                     
                     customArButton.style.display = 'none';
+                    deviceNote.style.display = 'none'; // Hide the note when in AR
                     // Show Controls
                     recordButton.style.display = 'flex';
                     
@@ -1101,6 +1156,9 @@
         }
 
         function gameTick() {
+            // FIXED: STRICT CHECK TO STOP TICK IF GAME OVER
+            if (gameState !== GAME_STATE.PLAYING) return;
+
             if (!currentPiece) return;
             if (isValidMove(currentPiece, { y: 1 })) {
                 currentPiece.userData.gridPos.y += 1;
@@ -1125,6 +1183,12 @@
 
         // 7. Reset game: Go back to scanning
         function resetGame() {
+            // FIXED: STOP OUTRO MUSIC IMMEDIATELY
+            if (gameOverSound) {
+                gameOverSound.pause();
+                gameOverSound.currentTime = 0;
+            }
+
             gameOverCard.style.display = 'none';
             
             for (let i = gameBoard.children.length - 1; i >= 0; i--) {
@@ -1281,6 +1345,9 @@
         }
 
         function spawnPiece() {
+            // FIXED: STRICT CHECK TO STOP SPAWNING IF GAME OVER
+            if (gameState !== GAME_STATE.PLAYING) return;
+
             const typeIndex = Math.floor(Math.random() * SHAPES.length);
             const rotationIndex = 0; 
             const shape = SHAPES[typeIndex][rotationIndex];
@@ -1344,7 +1411,8 @@
                     }
                     updatePiecePosition(currentPiece);
                     triggerHaptic(5); 
-                    playSound(rotateSound);
+                    // Changed: Now uses the low latency synth function directly here
+                    playRotateSound();
                     return; 
                 }
             }

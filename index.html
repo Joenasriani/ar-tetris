@@ -2,9 +2,9 @@
 <html lang="en">
 
 <head>
-    <title>AR Tetris 3D (v64 - Keyboard Lock Added)</title>
-    <meta charset="utf-8"q
-    <meta name="viewport" contq¡!!qent="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR/VR Tetris 3D</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="xr-spatial-tracking" content="true">
     
     <!-- Load Google Font: Montserrat (Medium & Bold) -->
@@ -170,12 +170,12 @@
         #record-button {
             top: 74px; /* Below music toggle */
             right: 20px;
-            /* Default: Grey/White Translucent */
+            /* --- CHANGED: Default is Grey/White Translucent --- */
             background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.5);
         }
         
-        /* Active Recording: Red */
+        /* --- CHANGED: Active Recording is Red --- */
         #record-button.recording {
             background: rgba(255, 0, 0, 0.9); 
             border-color: #FF4136;
@@ -428,8 +428,6 @@
         Launch AR
     </button>
     
-    <!-- Removed Tip Button -->
-
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
     
@@ -456,6 +454,7 @@
         
         // --- Global Variables ---
         let camera, scene, renderer;
+        let controller1, controller2; // VR Controllers
         let hitTestSource = null;
         let placementGrid = null; 
         let gameBoard = null; 
@@ -468,7 +467,7 @@
         let gameOverCard, goScore, goLevel, replayButton;
         let musicToggleBtn, musicIcon;
         // FIXED: Globally declare record vars
-        let recordButton, iconRecord, iconStop, recordingIndicator;
+        let recordButton, iconRecord, recordingIndicator;
         let recordingPanel, recTimer;
         
         let mediaRecorder;
@@ -521,8 +520,31 @@
         let isMusicMuted = false; 
         let blueGridMat, greenGridMat;
 
+        // Controller Logic Variables
+        const controllerData = {
+            left: { axisX: 0, axisY: 0, isSelecting: false, isSqueezing: false },
+            right: { axisX: 0, axisY: 0, isSelecting: false, isSqueezing: false }
+        };
+        // Debounce/Cooldowns for joystick movement
+        let lastMoveTime = 0;
+        let lastRotateTime = 0;
+        const JOYSTICK_MOVE_DELAY = 150; // ms between moves when holding stick
+        const JOYSTICK_ROTATE_DELAY = 250; 
+        const JOYSTICK_DEADZONE = 0.3;
+
         function triggerHaptic(duration = 20) {
+            // Mobile Haptic
             if (navigator.vibrate) navigator.vibrate(duration);
+            
+            // XR Controller Haptic
+            const session = renderer.xr.getSession();
+            if (session) {
+                for (const source of session.inputSources) {
+                    if (source.gamepad && source.gamepad.hapticActuators && source.gamepad.hapticActuators[0]) {
+                        source.gamepad.hapticActuators[0].pulse(1.0, duration);
+                    }
+                }
+            }
         }
 
         function playToot() {
@@ -559,6 +581,15 @@
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
             
+            // --- XR CONTROLLER SETUP ---
+            controller1 = renderer.xr.getController(0);
+            controller1.addEventListener('select', onControllerSelect);
+            scene.add(controller1);
+
+            controller2 = renderer.xr.getController(1);
+            controller2.addEventListener('select', onControllerSelect);
+            scene.add(controller2);
+
             // Bind UI Elements
             customArButton = document.getElementById('custom-ar-button');
             
@@ -647,56 +678,19 @@
                     stopRecording();
                 }
             });
-            
-            // --- NEW: Desktop Control Event Listener ---
-            window.addEventListener('keydown', (e) => {
-                // Only allow controls if the game is in PLAYING state
-                if (gameState === GAME_STATE.PLAYING) {
-                    // --- NEW: Lock floor with Space or Enter ---
-                    // This part is tricky because Space/Enter are usually used to rotate or drop.
-                    // However, the request is to lock the floor.
-                    // But wait, the request said "Space bar or enter as well will lock the floor WHEN SCANNING".
-                    // So we need to check the state.
-                } else if (gameState === GAME_STATE.PLACING) { // If we are ready to place/lock
-                     if (e.code === 'Space' || e.code === 'Enter') {
-                        // Simulate the start game logic
-                        updateMessage("", false); 
-                        playIntroAndStart(); 
-                        e.preventDefault();
-                        return;
-                    }
-                }
-                
-                // Game Controls (only when playing)
-                if (gameState === GAME_STATE.PLAYING) {
-                    if (e.key === 'ArrowLeft') {
-                        movePiece(-1);
-                        e.preventDefault();
-                    } else if (e.key === 'ArrowRight') {
-                        movePiece(1);
-                        e.preventDefault();
-                    } else if (e.key === 'ArrowDown') {
-                        hardDrop();
-                        e.preventDefault();
-                    } else if (e.code === 'Space') {
-                        rotatePiece();
-                        e.preventDefault();
-                    }
-                }
-            });
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
                     // Volume Settings
-                    if (bgmLoop) bgmLoop.volume = 0.05; 
-                    if (moveSound) moveSound.volume = 0.15; 
-                    if (rotateSound) rotateSound.volume = 0.15; 
+                    if (bgmLoop) bgmLoop.volume = 0.02; // Very Low for background
+                    if (moveSound) moveSound.volume = 0.08; 
+                    if (rotateSound) rotateSound.volume = 0.08; 
                     
                     // 3. Low volume for line clear
-                    if (lineClearSound) lineClearSound.volume = 0.1; 
+                    if (lineClearSound) lineClearSound.volume = 0.08; 
                     
                     // 5. Low volume for outro
-                    if (gameOverSound) gameOverSound.volume = 0.1; 
+                    if (gameOverSound) gameOverSound.volume = 0.08; 
 
                     if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
                         bgmLoop.play().catch(e => console.error("BGM resume error:", e));
@@ -727,7 +721,7 @@
                 window.location.reload();
             });
 
-            // Touch Controls
+            // Touch Controls (Mobile fallback)
             let touchStartX, touchStartY, touchStartTime;
             let strafeInterval = null;
             let isDragging = false;
@@ -815,6 +809,79 @@
             
             gameBoard = new THREE.Group();
             renderer.setAnimationLoop(animate);
+        }
+        
+        // --- XR CONTROLLER EVENT HANDLER ---
+        function onControllerSelect() {
+            // This handles the "Click" logic for the controllers
+            if (gameState === GAME_STATE.PLACING) {
+                updateMessage("", false); 
+                playIntroAndStart(); 
+            } else if (gameState === GAME_STATE.PLAYING) {
+                rotatePiece(); // Trigger rotates in game
+            }
+        }
+
+        // --- XR INPUT POLLING (JOYSTICKS) ---
+        function pollControllers() {
+            const session = renderer.xr.getSession();
+            if (!session) return;
+
+            const now = Date.now();
+
+            for (const source of session.inputSources) {
+                if (source.gamepad) {
+                    const gamepad = source.gamepad;
+                    
+                    // Standard WebXR Gamepad Mapping
+                    // axes[2] = Thumbstick X, axes[3] = Thumbstick Y
+                    // buttons[0] = Trigger, buttons[1] = Squeeze, buttons[4] or 5 = A/X
+                    
+                    // Fallback to 0/1 if 2/3 empty (some browsers/profiles differ)
+                    let axisX = gamepad.axes[2] || gamepad.axes[0] || 0;
+                    let axisY = gamepad.axes[3] || gamepad.axes[1] || 0;
+
+                    // MOVEMENT LEFT/RIGHT
+                    if (Math.abs(axisX) > JOYSTICK_DEADZONE) {
+                        if (now - lastMoveTime > JOYSTICK_MOVE_DELAY) {
+                            if (axisX < -JOYSTICK_DEADZONE) movePiece(-1);
+                            if (axisX > JOYSTICK_DEADZONE) movePiece(1);
+                            lastMoveTime = now;
+                        }
+                    }
+
+                    // ROTATE (Stick Up) or DROP (Stick Down)
+                    if (Math.abs(axisY) > JOYSTICK_DEADZONE) {
+                         if (now - lastMoveTime > JOYSTICK_MOVE_DELAY) {
+                            if (axisY > JOYSTICK_DEADZONE) {
+                                // Stick Down -> Soft Drop
+                                if (isValidMove(currentPiece, { y: 1 })) {
+                                    currentPiece.userData.gridPos.y += 1;
+                                    updatePiecePosition(currentPiece);
+                                    score += 1; // small bonus
+                                    scoreVal.textContent = score;
+                                }
+                            } else if (axisY < -JOYSTICK_DEADZONE) {
+                                // Stick Up -> Rotate
+                                if (now - lastRotateTime > JOYSTICK_ROTATE_DELAY) {
+                                    rotatePiece();
+                                    lastRotateTime = now;
+                                }
+                            }
+                            lastMoveTime = now;
+                         }
+                    }
+
+                    // SQUEEZE (Button index 1) -> Hard Drop
+                    if (gamepad.buttons[1] && gamepad.buttons[1].pressed) {
+                        // Debounce squeeze slightly via lastMoveTime
+                         if (now - lastMoveTime > 500) { 
+                             hardDrop();
+                             lastMoveTime = now;
+                         }
+                    }
+                }
+            }
         }
 
         function startRecording() {
@@ -916,6 +983,12 @@
         function animate(timestamp, frame) {
             if (frame) {
                 const session = renderer.xr.getSession();
+                
+                // --- UPDATE VR CONTROLS ---
+                if (gameState === GAME_STATE.PLAYING) {
+                    pollControllers();
+                }
+
                 if (!session) {
                     renderer.render(scene, camera);
                     return;
@@ -940,7 +1013,7 @@
                             if (isFloor) {
                                 if (gameState === GAME_STATE.SCANNING) {
                                     gameState = GAME_STATE.PLACING;
-                                    updateMessage("Tap to lock", false);
+                                    updateMessage("Tap or Trigger to lock", false);
                                     placementGrid.material = greenGridMat; 
                                     triggerHaptic(50); 
                                 }
@@ -1126,7 +1199,7 @@
             }
             
             if (linesCleared > 0) {
-                // Slow Animation (Pause Game)
+                // 4. Slow Animation (Pause Game)
                 clearInterval(gameLoopInterval);
 
                 const blocksToAnimate = [];
@@ -1226,7 +1299,7 @@
                     if (shape[y][x]) {
                         const block = new THREE.Mesh(blockGeo, blockMat);
                         const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                        block.add( bevel );
+                        block.add(bevel);
                         block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
                         piece.add(block);
                     }
@@ -1384,5 +1457,4 @@
             for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
         }
     </script></body>
-</html>```
-
+</html>

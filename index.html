@@ -452,9 +452,9 @@
     <!-- Audio -->
     <audio id="audio-tts" preload="auto" playsinline></audio>
     
+    <!-- RE-INTRODUCED PLACEHOLDER AUDIO ELEMENT -->
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
-    <!-- Rotate Sound Removed: We now synthesize it for zero latency -->
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
     <!-- TOOT Sound -->
@@ -536,11 +536,14 @@
             1: 0x00F0F0, 2: 0xF0F000, 3: 0xA000F0, 4: 0x00F000, 5: 0xF00000, 6: 0x0000F0, 7: 0xF0A000,
         };
 
-        let moveSound, gameOverSound, bgmLoop, lineClearSound;
+        let moveSound, gameOverSound, lineClearSound;
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let audioUnlocked = false;
         let isMusicMuted = false; 
         let blueGridMat, greenGridMat;
+        
+        // BGM Specific HTML Audio Element
+        let bgmElement; 
 
         // Controller Logic Variables
         const controllerData = {
@@ -569,8 +572,24 @@
             }
         }
 
-        // --- NEW: SYNTHESIZED "AIRY WOOF" SOUND ---
-        // This plays directly from the audio context for zero latency
+        // --- BGM HTML Audio Control ---
+        function startBGM() {
+            if (bgmElement) {
+                bgmElement.volume = 0.05; // Low gain (5%)
+                if (bgmElement.paused) {
+                    bgmElement.play().catch(e => console.warn("BGM play failed (placeholder link)", e));
+                }
+            }
+        }
+
+        function stopBGM() {
+            if (bgmElement) {
+                bgmElement.pause();
+                bgmElement.currentTime = 0;
+            }
+        }
+
+        // --- SYNTHESIZED "AIRY WOOF" SOUND ---
         function playRotateSound() {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             
@@ -612,7 +631,6 @@
             gainNode.connect(audioCtx.destination);
             osc.type = 'sine';
             osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1); 
             gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); 
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
             osc.start();
@@ -675,7 +693,9 @@
             recordingPanel = document.getElementById('recording-panel');
             recTimer = document.getElementById('rec-time');
 
-            bgmLoop = document.getElementById('audio-bgm');
+            // --- BGM Element Binding ---
+            bgmElement = document.getElementById('audio-bgm');
+            
             moveSound = document.getElementById('audio-move');
             gameOverSound = document.getElementById('audio-gameover');
             lineClearSound = document.getElementById('audio-lineclear');
@@ -693,20 +713,22 @@
                 console.log("Unlocking audio context...");
                 if(audioCtx.state === 'suspended') audioCtx.resume();
                 triggerHaptic(5); 
-                const allSounds = [bgmLoop, moveSound, gameOverSound, lineClearSound];
+                
+                const allSounds = [bgmElement, gameOverSound, lineClearSound];
                 
                 allSounds.forEach(s => {
                     if(s) {
                         const p = s.play();
                         if (p !== undefined) {
                             p.then(() => {
-                                if(s === bgmLoop) {
-                                    console.log("BGM started successfully");
+                                // If BGM loaded, set low volume
+                                if (s === bgmElement) {
+                                    s.volume = 0.05; // Set low gain
                                 } else {
                                     s.pause();
                                     s.currentTime = 0;
                                 }
-                            }).catch(e => console.warn("Audio play error:", e));
+                            }).catch(e => console.warn("Audio play failed (user must interact first)", e));
                         }
                     }
                 });
@@ -739,17 +761,12 @@
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
                     // Volume Settings
-                    if (bgmLoop) bgmLoop.volume = 0.02; // Very Low for background
                     if (moveSound) moveSound.volume = 0.08; 
-                    
-                    // 3. Low volume for line clear
                     if (lineClearSound) lineClearSound.volume = 0.08; 
-                    
-                    // 5. Low volume for outro
                     if (gameOverSound) gameOverSound.volume = 0.08; 
 
-                    if (bgmLoop && bgmLoop.paused && !isMusicMuted) {
-                        bgmLoop.play().catch(e => console.error("BGM resume error:", e));
+                    if (!isMusicMuted) {
+                        startBGM(); // Use HTML audio element
                     }
                     
                     customArButton.style.display = 'none';
@@ -772,7 +789,7 @@
             });
             
             renderer.xr.addEventListener('sessionend', () => {
-                if (bgmLoop) bgmLoop.pause();
+                stopBGM();
                 if (isRecording) stopRecording();
                 recordButton.style.display = 'none';
                 window.location.reload();
@@ -1018,14 +1035,16 @@
         }
 
         function toggleMusic() {
-            if (!bgmLoop) return;
+            if (!bgmElement) return;
 
             if (isMusicMuted) {
-                bgmLoop.play().catch(e => console.error("BGM play failed:", e));
+                // Unmute/start BGM
+                startBGM();
                 musicIcon.textContent = "volume_up";
                 isMusicMuted = false;
             } else {
-                bgmLoop.pause();
+                // Mute/stop BGM
+                stopBGM();
                 musicIcon.textContent = "volume_off";
                 isMusicMuted = true;
             }
@@ -1179,7 +1198,7 @@
             goLevel.textContent = level;
             gameOverCard.style.display = 'flex';
             
-            if (bgmLoop) bgmLoop.pause();
+            stopBGM();
             playSound(gameOverSound);
         }
 
@@ -1209,9 +1228,9 @@
             // Hide HUD
             hudPanel.style.opacity = '0';
 
-            if (bgmLoop && !isMusicMuted) {
-                bgmLoop.currentTime = 0;
-                bgmLoop.play().catch(e => console.error("BGM restart failed:", e));
+            // Restart BGM if not muted
+            if (!isMusicMuted) {
+                startBGM();
             }
 
             // Reset to SCANNING state
@@ -1348,7 +1367,7 @@
         }
 
         function spawnPiece() {
-            // FIXED: STRICT CHECK TO STOP SPAWNING IF GAME OVER
+            // FIXED: CRITICAL CHECK TO PREVENT STUCK PIECES ON GAME OVER
             if (gameState !== GAME_STATE.PLAYING) return;
 
             const typeIndex = Math.floor(Math.random() * SHAPES.length);

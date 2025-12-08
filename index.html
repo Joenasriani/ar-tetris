@@ -801,16 +801,20 @@
             let isDragging = false;
             const DRAG_THRESHOLD_Y = 75; 
             const STRAFE_INTERVAL_MS = 130; 
+            const SCREEN_THIRD = window.innerWidth / 3;
 
             function onTouchStart(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button') || e.target.closest('#replay-button')) return;
+                // Prevent interfering with buttons
+                if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn') || e.target.closest('#replay-button')) return;
 
                 e.preventDefault(); 
+                
                 if (gameState === GAME_STATE.PLACING) {
                     updateMessage("", false); 
                     playIntroAndStart(); 
                     return; 
                 }
+                
                 if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) return; 
 
                 if (strafeInterval) clearInterval(strafeInterval);
@@ -819,26 +823,27 @@
                 touchStartY = touch.pageY;
                 touchStartTime = new Date().getTime();
                 isDragging = false;
-
-                const screenWidth = window.innerWidth;
-                if (touchStartX < screenWidth * 0.33) {
+                
+                // Start continuous strafing if touch is held on sides
+                if (touchStartX < SCREEN_THIRD) {
                     movePiece(-1); 
                     strafeInterval = setInterval(() => movePiece(-1), STRAFE_INTERVAL_MS);
-                } else if (touchStartX > screenWidth * 0.66) {
+                } else if (touchStartX > SCREEN_THIRD * 2) {
                     movePiece(1); 
                     strafeInterval = setInterval(() => movePiece(1), STRAFE_INTERVAL_MS);
                 }
             }
             
             function onTouchMove(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
+                if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn')) return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) return;
                 
                 const touch = e.touches[0];
                 const deltaY = touch.pageY - touchStartY;
                 
-                if (deltaY > DRAG_THRESHOLD_Y) {
+                if (deltaY > DRAG_THRESHOLD_Y && !isDragging) {
+                    // Vertical drag for hard drop
                     if (strafeInterval) clearInterval(strafeInterval); 
                     hardDrop();
                     touchStartY = null; 
@@ -848,17 +853,19 @@
             }
             
             function onTouchEnd(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('#music-toggle') || e.target.closest('#record-button')) return;
+                if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn')) return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING) return;
                 if (strafeInterval) clearInterval(strafeInterval);
+                
+                // If this was a drag (hard drop), ignore as a tap
                 if (isDragging) { isDragging = false; return; }
                 
-                const screenWidth = window.innerWidth;
                 const touchTime = new Date().getTime() - touchStartTime;
 
-                if (touchTime < STRAFE_INTERVAL_MS * 1.5) { 
-                    if (touchStartX > screenWidth * 0.33 && touchStartX < screenWidth * 0.66) {
+                // Check if it was a quick middle tap for rotation
+                if (touchTime < 250) { // Short tap threshold
+                    if (touchStartX > SCREEN_THIRD && touchStartX < SCREEN_THIRD * 2) {
                         rotatePiece();
                     }
                 }
@@ -1199,6 +1206,9 @@
             gameOverCard.style.display = 'flex';
 
             // FIXED: Ensure the current piece is removed/nullified immediately upon Game Over logic starting
+            if (currentPiece) {
+                gameBoard.remove(currentPiece);
+            }
             currentPiece = null; 
             
             stopBGM();
@@ -1292,44 +1302,56 @@
 
                 const blocksToAnimate = [];
                 gameBoard.children.forEach(block => {
-                    const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                    if (rowsToClear.includes(blockY)) {
-                        blocksToAnimate.push(block);
+                    // Check if the block is one of the permanent, locked blocks (not the current falling piece)
+                    if (block !== currentPiece) {
+                        // Calculate grid Y position
+                        const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
+                        if (rowsToClear.includes(blockY)) {
+                            blocksToAnimate.push(block);
+                        }
                     }
                 });
 
                 let progress = 0;
                 const duration = 1000; // MUST BE 1000ms (1 second)
-                const startTime = Date.now();
+                let lastTimestamp = performance.now(); // Use performance.now() for precise timing
 
-                function animateClear() {
-                    const now = Date.now();
-                    progress = (now - startTime) / duration;
+                function animateClear(timestamp) {
+                    // Use time elapsed since last frame instead of relying purely on frame count
+                    const deltaTime = timestamp - lastTimestamp;
+                    lastTimestamp = timestamp;
+
+                    // Calculate progress based on time, clamping at 1.0 to ensure completion
+                    progress = Math.min(1.0, progress + (deltaTime / duration));
 
                     if (progress < 1) {
                         blocksToAnimate.forEach(b => {
-                            // Spin & Shrink
+                            // Spin & Shrink (rotation speed adjusted to complete in 1 second)
+                            const rotationFactor = 0.01; // Base rotation factor
                             b.scale.setScalar(1 - progress);
-                            // CHANGED: Increased rotation speed for better visual feedback in 1 second
-                            b.rotation.y += 1.0; 
-                            b.rotation.z += 0.5;
+                            
+                            // The large rotation value ensures fast spin, compensating for low/variable frame rates
+                            b.rotation.y += (Math.PI * 2) * (deltaTime / duration); 
+                            b.rotation.z += (Math.PI / 2) * (deltaTime / duration);
                         });
                         requestAnimationFrame(animateClear);
                     } else {
-                        // Done animating, remove blocks
+                        // Animation complete, finalize cleanup
+                        
+                        // Remove animated blocks visually
                         gameBoard.children = gameBoard.children.filter(block => {
                             if (block === currentPiece) return true; 
                             const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
                             return !rowsToClear.includes(blockY); 
                         });
                         
-                        // Shift Grid
+                        // Shift Grid Data
                         for (const y of rowsToClear.sort((a, b) => a - b)) { 
                             grid.splice(y, 1);
                             grid.unshift(Array(BOARD_WIDTH).fill(0));
                         }
                         
-                        // Shift Visual Blocks
+                        // Shift Visual Blocks down
                         gameBoard.children.forEach(block => {
                             if (block === currentPiece) return; 
                             const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
@@ -1346,7 +1368,9 @@
                         gameLoopInterval = setInterval(gameTick, currentDropSpeed);
                     }
                 }
-                animateClear();
+                // Start animation loop using precise time measurement
+                lastTimestamp = performance.now();
+                requestAnimationFrame(animateClear);
             }
         }
 
@@ -1376,6 +1400,29 @@
             const typeIndex = Math.floor(Math.random() * SHAPES.length);
             const rotationIndex = 0; 
             const shape = SHAPES[typeIndex][rotationIndex];
+            
+            // New piece spawns at grid y=0. Check if this row is already blocked.
+            if (shape.length > 0) {
+                const spawnRow = 0; 
+                const shapeWidth = shape[0].length;
+                const spawnX = Math.floor((BOARD_WIDTH - shapeWidth) / 2);
+
+                for (let y = 0; y < shape.length; y++) {
+                    for (let x = 0; x < shape[y].length; x++) {
+                        if (shape[y][x]) {
+                            const boardX = spawnX + x;
+                            const boardY = spawnRow + y;
+                            if (boardY >= 0 && grid[boardY][boardX]) {
+                                // Collision detected at spawn point - Game Over!
+                                gameOver();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+
             const color = COLORS[typeIndex + 1];
             
             const piece = new THREE.Group();
@@ -1400,7 +1447,6 @@
             updatePiecePosition(piece);
             gameBoard.add(piece);
             currentPiece = piece;
-            if (!isValidMove(currentPiece, {})) gameOver();
         }
         
         function rotatePiece() {

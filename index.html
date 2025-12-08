@@ -1277,7 +1277,7 @@
                 });
 
                 let progress = 0;
-                const duration = 1000; // 1 second
+                const duration = 1000; // MUST BE 1000ms (1 second)
                 const startTime = Date.now();
 
                 function animateClear() {
@@ -1288,8 +1288,9 @@
                         blocksToAnimate.forEach(b => {
                             // Spin & Shrink
                             b.scale.setScalar(1 - progress);
-                            b.rotation.y += 0.2; 
-                            b.rotation.z += 0.1;
+                            // CHANGED: Increased rotation speed for better visual feedback in 1 second
+                            b.rotation.y += 1.0; 
+                            b.rotation.z += 0.5;
                         });
                         requestAnimationFrame(animateClear);
                     } else {
@@ -1528,4 +1529,3 @@
         }
     </script></body>
 </html>
-

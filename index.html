@@ -1197,6 +1197,9 @@
             goScore.textContent = score;
             goLevel.textContent = level;
             gameOverCard.style.display = 'flex';
+
+            // FIXED: Ensure the current piece is removed/nullified immediately upon Game Over logic starting
+            currentPiece = null; 
             
             stopBGM();
             playSound(gameOverSound);

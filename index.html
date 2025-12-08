@@ -244,6 +244,7 @@
             cursor: pointer;
             z-index: 101;
             transition: transform 0.2s;
+            /* IMPORTANT: Ensure button pointer events are active */
             pointer-events: auto; 
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -257,27 +258,25 @@
         /* --- Device Note Above Button --- */
         #device-note {
             position: absolute;
-            /* RETAIN: Positioning relative to bottom */
             bottom: 150px; 
             left: 50%;
             transform: translateX(-50%);
             color: rgba(255, 255, 255, 0.7);
-            /* RETAIN: Smaller font size */
             font-size: 0.55rem;
             font-family: 'Montserrat', sans-serif;
             text-transform: uppercase;
             letter-spacing: 1.5px;
-            pointer-events: none;
+            /* CRITICAL FIX: Ensure events pass through this static element to the button below */
+            pointer-events: none; 
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
             z-index: 101;
-            white-space: nowrap;
-            /* RETAIN: Flex container to allow line break */
+            /* RETAINED STYLES FOR LINE BREAK */
             display: flex;
             flex-direction: column;
             align-items: center;
             line-height: 1.2;
         }
-        /* MODIFIED: Increased margin-top for better separation */
+        /* RETAINED STYLES FOR LINE BREAK */
         #device-note span {
             display: block;
             margin-top: 2px; 
@@ -344,6 +343,7 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             width: 100%;
+            pointer-events: auto;
         }
 
         #replay-button:active {
@@ -455,7 +455,7 @@
     </button>
 
     <!-- Device Note & Main Launch Button -->
-    <div id="device-note">Mobile and Meta Quest<span>only</span></div>
+    <div id="device-note">Mobile and Meta Quest<br><span>only</span></div>
     <button id="custom-ar-button">
         LAUNCH AR/VR
     </button>
@@ -1289,7 +1289,7 @@
                 flash.style.height = '100%';
                 flash.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
                 flash.style.zIndex = '999';
-                flash.style.pointer-events = 'none'; 
+                flash.style.pointerEvents = 'none'; 
                 document.body.appendChild(flash);
                 setTimeout(() => document.body.removeChild(flash), 100);
             }

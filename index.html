@@ -93,7 +93,7 @@
             font-family: 'Montserrat', monospace; 
         }
         
-        #level-value {
+        #level-val {
             color: #00FFFF; 
         }
 
@@ -409,7 +409,7 @@
     <!-- 2. Feedback (Recording Timer) -->
     <div id="recording-panel">
         <div id="recording-dot"></div>
-        <div id="recording-timer" id="rec-time">00:00</div>
+        <div id="rec-time">00:00</div>
     </div>
 
     <!-- 5. Onboarding Message -->
@@ -1273,7 +1273,7 @@
                 
                 if (newLevel > level) {
                     level = newLevel;
-                    levelBox.textContent = `Level: ${level}`;
+                    levelVal.textContent = level;
                     currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
                     
                     clearInterval(gameLoopInterval);
@@ -1350,11 +1350,12 @@
                         // Animation complete, finalize cleanup
                         
                         // Remove animated blocks visually
-                        gameBoard.children = gameBoard.children.filter(block => {
-                            if (block === currentPiece) return true; 
+                        const blocksToRemove = gameBoard.children.filter(block => {
+                            if (block === currentPiece) return false; 
                             const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                            return !rowsToClear.includes(blockY); 
+                            return rowsToClear.includes(blockY); 
                         });
+                        blocksToRemove.forEach(block => gameBoard.remove(block));
                         
                         // Shift Grid Data
                         for (const y of rowsToClear.sort((a, b) => a - b)) { 

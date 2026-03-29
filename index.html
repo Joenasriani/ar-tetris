@@ -93,7 +93,7 @@
             font-family: 'Montserrat', monospace; 
         }
         
-        #level-value {
+        #level-val {
             color: #00FFFF; 
         }
 
@@ -121,7 +121,7 @@
             animation: blink-red 1s infinite;
         }
         
-        #recording-timer {
+        #rec-time {
             font-size: 0.8rem;
             font-weight: 600;
             font-variant-numeric: tabular-nums;
@@ -409,7 +409,7 @@
     <!-- 2. Feedback (Recording Timer) -->
     <div id="recording-panel">
         <div id="recording-dot"></div>
-        <div id="recording-timer" id="rec-time">00:00</div>
+        <div id="rec-time">00:00</div>
     </div>
 
     <!-- 5. Onboarding Message -->
@@ -464,7 +464,7 @@
     <audio id="audio-tts" preload="auto" playsinline></audio>
     
     <!-- RE-INTRODUCED PLACEHOLDER AUDIO ELEMENT -->
-    <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
+    <audio id="audio-bgm" src="music/music-rock.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
@@ -759,6 +759,7 @@
             });
 
             // --- RECORDING LOGIC ---
+            if (recordButton) {
             recordButton.addEventListener('click', () => {
                 triggerHaptic(20);
                 playToot(); 
@@ -768,6 +769,7 @@
                     stopRecording();
                 }
             });
+            }
 
             renderer.xr.addEventListener('sessionstart', () => {
                 if (gameState === GAME_STATE.INITIALIZING) {
@@ -977,14 +979,30 @@
         }
 
         function startRecording() {
-            const stream = renderer.domElement.captureStream(30); 
+            if (typeof MediaRecorder === 'undefined' || !renderer.domElement.captureStream) {
+                updateMessage("Recording not supported in this browser");
+                setTimeout(() => updateMessage(""), 3000);
+                return;
+            }
+
+            let stream;
+            try {
+                stream = renderer.domElement.captureStream(30);
+            } catch (e) {
+                console.error("captureStream failed:", e);
+                updateMessage("Recording unavailable (canvas capture failed)");
+                setTimeout(() => updateMessage(""), 3000);
+                return;
+            }
+
             const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
             
             try {
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
             } catch (e) {
                 console.error("MediaRecorder setup failed:", e);
-                // updateMessage("Recording not supported"); // Dont show msg in HUD
+                updateMessage("Recording not supported in this browser");
+                setTimeout(() => updateMessage(""), 3000);
                 return;
             }
 
@@ -1004,7 +1022,7 @@
                 const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
                 const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
                 const s = (elapsed % 60).toString().padStart(2, '0');
-                recTimer.textContent = `${m}:${s}`;
+                if (recTimer) recTimer.textContent = `${m}:${s}`;
             }, 1000);
         }
 
@@ -1017,7 +1035,7 @@
                 recordButton.classList.remove('recording');
                 iconRecord.textContent = "fiber_manual_record"; // Change material icon text back
                 recordingPanel.style.display = 'none';
-                recTimer.textContent = "00:00";
+                if (recTimer) recTimer.textContent = "00:00";
                 
                 updateMessage("Processing video...");
             }
@@ -1273,7 +1291,7 @@
                 
                 if (newLevel > level) {
                     level = newLevel;
-                    levelBox.textContent = `Level: ${level}`;
+                    levelVal.textContent = level;
                     currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
                     
                     clearInterval(gameLoopInterval);
@@ -1349,11 +1367,18 @@
                     } else {
                         // Animation complete, finalize cleanup
                         
-                        // Remove animated blocks visually
-                        gameBoard.children = gameBoard.children.filter(block => {
-                            if (block === currentPiece) return true; 
+                        // Remove animated blocks visually using safe Three.js remove()
+                        const blocksToRemove = gameBoard.children.filter(block => {
+                            if (block === currentPiece) return false;
                             const blockY = Math.round(BOARD_HEIGHT / 2 - 0.5 - (block.position.y / BLOCK_SIZE));
-                            return !rowsToClear.includes(blockY); 
+                            return rowsToClear.includes(blockY);
+                        });
+                        blocksToRemove.forEach(block => {
+                            block.traverse(child => {
+                                if (child.geometry) child.geometry.dispose();
+                                if (child.material) child.material.dispose();
+                            });
+                            gameBoard.remove(block);
                         });
                         
                         // Shift Grid Data

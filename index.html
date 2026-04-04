@@ -508,6 +508,7 @@
         let isRecording = false;
         let recStartTime;
         let recInterval;
+        const REC_MSG_DURATION_MS = 4000;
         
         let introScreen;
         
@@ -759,7 +760,7 @@
             });
 
             // --- RECORDING LOGIC ---
-            recordButton.addEventListener('click', () => {
+            if (recordButton) recordButton.addEventListener('click', () => {
                 triggerHaptic(20);
                 playToot(); 
                 if (!isRecording) {
@@ -976,15 +977,42 @@
             }
         }
 
+        function resetRecordingUI() {
+            if (recordButton) recordButton.classList.remove('recording');
+            if (iconRecord) iconRecord.textContent = "fiber_manual_record";
+            if (recordingPanel) recordingPanel.style.display = 'none';
+            if (recTimer) recTimer.textContent = "00:00";
+        }
+
+        function showUnsupportedRecordingMessage() {
+            updateMessage("Recording not supported on this device/browser");
+            setTimeout(() => updateMessage(""), REC_MSG_DURATION_MS);
+            resetRecordingUI();
+        }
+
         function startRecording() {
-            const stream = renderer.domElement.captureStream(30); 
+            // Feature detection: MediaRecorder and captureStream must both be available
+            if (typeof MediaRecorder === 'undefined' || typeof renderer?.domElement?.captureStream !== 'function') {
+                console.warn("Recording not supported: MediaRecorder or captureStream unavailable.");
+                showUnsupportedRecordingMessage();
+                return;
+            }
+
+            let stream;
+            try {
+                stream = renderer.domElement.captureStream(30);
+            } catch (e) {
+                console.error("captureStream failed:", e);
+                showUnsupportedRecordingMessage();
+                return;
+            }
+
             const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-            
             try {
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
             } catch (e) {
                 console.error("MediaRecorder setup failed:", e);
-                // updateMessage("Recording not supported"); // Dont show msg in HUD
+                showUnsupportedRecordingMessage();
                 return;
             }
 
@@ -994,9 +1022,9 @@
             mediaRecorder.start();
             isRecording = true;
             
-            recordButton.classList.add('recording');
-            iconRecord.textContent = "stop"; // Change material icon text to stop
-            recordingPanel.style.display = 'flex';
+            if (recordButton) recordButton.classList.add('recording');
+            if (iconRecord) iconRecord.textContent = "stop"; // Change material icon text to stop
+            if (recordingPanel) recordingPanel.style.display = 'flex';
             
             // Start timer
             recStartTime = Date.now();
@@ -1004,7 +1032,7 @@
                 const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
                 const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
                 const s = (elapsed % 60).toString().padStart(2, '0');
-                recTimer.textContent = `${m}:${s}`;
+                if (recTimer) recTimer.textContent = `${m}:${s}`;
             }, 1000);
         }
 
@@ -1013,12 +1041,7 @@
                 mediaRecorder.stop();
                 isRecording = false;
                 clearInterval(recInterval);
-                
-                recordButton.classList.remove('recording');
-                iconRecord.textContent = "fiber_manual_record"; // Change material icon text back
-                recordingPanel.style.display = 'none';
-                recTimer.textContent = "00:00";
-                
+                resetRecordingUI();
                 updateMessage("Processing video...");
             }
         }

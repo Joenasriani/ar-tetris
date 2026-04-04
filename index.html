@@ -38,6 +38,7 @@
             display: block;
             width: 100%;
             height: 100%;
+            touch-action: none;
         }
 
         #default-ar-button {
@@ -809,80 +810,97 @@
 
             // Touch Controls (Mobile fallback)
             let touchStartX, touchStartY, touchStartTime;
-            let strafeInterval = null;
             let isDragging = false;
-            const DRAG_THRESHOLD_Y = 75; 
-            const STRAFE_INTERVAL_MS = 130; 
-            const SCREEN_THIRD = window.innerWidth / 3;
+            let lastTouchAction = 0;
+            const DRAG_THRESHOLD_Y = 60;
+            const TOUCH_COOLDOWN_MS = 120;
+
+            function getTouchZone(x) {
+                const third = window.innerWidth / 3;
+                if (x < third) return 'left';
+                if (x > third * 2) return 'right';
+                return 'mid';
+            }
+
+            function canTouchAct() {
+                const t = Date.now();
+                if (t - lastTouchAction < TOUCH_COOLDOWN_MS) return false;
+                lastTouchAction = t;
+                return true;
+            }
 
             function onTouchStart(e) {
                 // Prevent interfering with buttons
                 if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn') || e.target.closest('#replay-button')) return;
 
-                e.preventDefault(); 
-                
-                if (gameState === GAME_STATE.PLACING) {
-                    updateMessage("", false); 
-                    playIntroAndStart(); 
-                    return; 
-                }
-                
-                if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) return; 
+                e.preventDefault();
 
-                if (strafeInterval) clearInterval(strafeInterval);
+                if (gameState === GAME_STATE.PLACING) {
+                    updateMessage("", false);
+                    playIntroAndStart();
+                    return;
+                }
+
+                if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) return;
+
                 const touch = e.touches[0];
                 touchStartX = touch.pageX;
                 touchStartY = touch.pageY;
-                touchStartTime = new Date().getTime();
+                touchStartTime = Date.now();
                 isDragging = false;
-                
-                // Start continuous strafing if touch is held on sides
-                if (touchStartX < SCREEN_THIRD) {
-                    movePiece(-1); 
-                    strafeInterval = setInterval(() => movePiece(-1), STRAFE_INTERVAL_MS);
-                } else if (touchStartX > SCREEN_THIRD * 2) {
-                    movePiece(1); 
-                    strafeInterval = setInterval(() => movePiece(1), STRAFE_INTERVAL_MS);
+
+                // Left/right zones: single tap move, no repeat
+                const zone = getTouchZone(touchStartX);
+                if (zone === 'left') {
+                    if (canTouchAct()) movePiece(-1);
+                    isDragging = true; // prevent rotate on touchend
+                } else if (zone === 'right') {
+                    if (canTouchAct()) movePiece(1);
+                    isDragging = true; // prevent rotate on touchend
                 }
+                // Middle zone: handled on touchend (tap) or touchmove (swipe)
             }
-            
+
             function onTouchMove(e) {
                 if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn')) return;
                 e.preventDefault();
-                if (gameState !== GAME_STATE.PLAYING || !touchStartY || e.touches.length > 1) return;
-                
+                if (gameState !== GAME_STATE.PLAYING || touchStartY == null || e.touches.length > 1) return;
+
                 const touch = e.touches[0];
                 const deltaY = touch.pageY - touchStartY;
-                
-                if (deltaY > DRAG_THRESHOLD_Y && !isDragging) {
-                    // Vertical drag for hard drop
-                    if (strafeInterval) clearInterval(strafeInterval); 
-                    hardDrop();
-                    touchStartY = null; 
-                    touchStartX = null;
-                    isDragging = true; 
+                const deltaX = Math.abs(touch.pageX - touchStartX);
+
+                // Middle zone only: swipe down triggers one soft drop step
+                if (!isDragging && getTouchZone(touchStartX) === 'mid' && deltaY > DRAG_THRESHOLD_Y && deltaY > deltaX) {
+                    if (canTouchAct()) {
+                        if (currentPiece && isValidMove(currentPiece, { y: 1 })) {
+                            currentPiece.userData.gridPos.y += 1;
+                            updatePiecePosition(currentPiece);
+                            score += 1;
+                            scoreVal.textContent = score;
+                        }
+                    }
+                    isDragging = true; // one step per gesture, no rotate on end
                 }
             }
-            
+
             function onTouchEnd(e) {
                 if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn')) return;
                 e.preventDefault();
                 if (gameState !== GAME_STATE.PLAYING) return;
-                if (strafeInterval) clearInterval(strafeInterval);
-                
-                // If this was a drag (hard drop), ignore as a tap
-                if (isDragging) { isDragging = false; return; }
-                
-                const touchTime = new Date().getTime() - touchStartTime;
 
-                // Check if it was a quick middle tap for rotation
-                if (touchTime < 250) { // Short tap threshold
-                    if (touchStartX > SCREEN_THIRD && touchStartX < SCREEN_THIRD * 2) {
-                        rotatePiece();
-                    }
+                // If this was a drag or side tap, ignore as a tap
+                if (isDragging) { isDragging = false; return; }
+
+                const touchTime = Date.now() - touchStartTime;
+
+                // Quick middle tap => rotate
+                if (touchTime < 250 && getTouchZone(touchStartX) === 'mid') {
+                    if (canTouchAct()) rotatePiece();
                 }
+                isDragging = false;
             }
-            
+
             renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
             renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
             renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });

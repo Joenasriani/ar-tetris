@@ -5,24 +5,17 @@
     <title>AR Tetris 3D (Quest Ready)</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="xr-spatial-tracking" content="true">
+    <meta name="xr-spatial-tracking" content="allow">
     
     <!-- Load Google Font: Montserrat (Medium & Bold) -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <!-- Load Material Icons -->
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
-        /* --- Load Custom Font --- */
-        @font-face {
-            font-family: 'TetrisBlocks';
-            src: url('font/TetrisBlocks-P99g.ttf') format('truetype');
-        }
-
         /* Basic reset */
         body, html {
             width: 100%;
             height: 100%;
+            min-height: 100dvh;
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -159,8 +152,16 @@
             transform: scale(0.95);
         }
         
-        .control-btn .material-icons-round {
+        .control-btn .control-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1em;
+            height: 1em;
             font-size: 24px;
+            line-height: 1;
+            font-weight: 800;
+            font-family: Arial, Helvetica, sans-serif;
         }
 
         #music-toggle {
@@ -189,7 +190,7 @@
             100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
         }
         
-        #record-button .material-icons-round {
+        #record-button .control-icon {
             color: white;
         }
 
@@ -281,6 +282,102 @@
         #device-note span {
             display: block;
             margin-top: 2px; 
+        }
+
+
+        #launch-panel {
+            position: absolute;
+            left: 50%;
+            bottom: max(24px, env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            width: min(92vw, 430px);
+            z-index: 101;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        #launch-status {
+            font-size: 0.88rem;
+            line-height: 1.35;
+            color: rgba(255,255,255,0.92);
+            font-weight: 600;
+            text-align: center;
+        }
+
+        #launch-details {
+            font-size: 0.7rem;
+            line-height: 1.45;
+            color: rgba(255,255,255,0.68);
+            text-align: center;
+        }
+
+        #launch-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .launch-btn {
+            min-height: 48px;
+            padding: 13px 16px;
+            border-radius: 999px;
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 800;
+            border: none;
+            cursor: pointer;
+            pointer-events: auto;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .launch-btn:disabled {
+            opacity: 0.48;
+            cursor: not-allowed;
+            animation: none !important;
+            filter: grayscale(0.5);
+        }
+
+        #fallback-3d-button {
+            display: none;
+            background: linear-gradient(135deg, #2ecc71, #1f8f4d);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.28);
+        }
+
+        #custom-ar-button {
+            position: static;
+            width: 100%;
+            transform: none;
+            padding: 13px 16px;
+            min-height: 50px;
+            font-size: 0.95rem;
+        }
+
+        #custom-ar-button:active {
+            transform: scale(0.98);
+        }
+
+        #reset-ar-button {
+            top: 128px;
+            right: 20px;
+            display: none;
+            background: rgba(30, 30, 30, 0.7);
+        }
+
+        @media (orientation: landscape) and (max-height: 520px) {
+            #launch-panel {
+                width: min(86vw, 520px);
+                bottom: max(12px, env(safe-area-inset-bottom));
+                padding: 12px;
+            }
+
+            #launch-status { font-size: 0.78rem; }
+            #launch-details { display: none; }
+            #launch-actions { grid-template-columns: 1fr 1fr; }
         }
 
 
@@ -415,7 +512,7 @@
 
     <!-- 5. Onboarding Message -->
     <div id="message-box" class="glass-panel">
-        <span class="material-icons-round phone-icon">smartphone</span>
+        <span class="phone-icon" aria-hidden="true">▯</span>
         <span id="message-text">Scan floor to start</span>
     </div>
 
@@ -433,7 +530,7 @@
             </div>
         </div>
         <button id="replay-button">
-            <span class="material-icons-round" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;">replay</span>
+            <span class="control-icon" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;">↻</span>
             Play Again
         </button>
     </div>
@@ -447,18 +544,25 @@
     <!-- 3. Consistent Icons -->
     <!-- Music Toggle -->
     <button id="music-toggle" class="control-btn" aria-label="Toggle Music">
-        <span class="material-icons-round" id="icon-music">volume_up</span>
+        <span class="control-icon" id="icon-music">♪</span>
     </button>
 
     <!-- Recording Button -->
     <button id="record-button" class="control-btn" aria-label="Record Video">
-        <span class="material-icons-round" id="icon-record-btn">fiber_manual_record</span>
+        <span class="control-icon" id="icon-record-btn">●</span>
     </button>
 
-    <!-- Device Note & Main Launch Button -->
-    <div id="device-note">Mobile and Meta Quest<br><span>only</span></div>
-    <button id="custom-ar-button">
-        LAUNCH AR/VR
+    <!-- Capability-gated launch panel -->
+    <div id="launch-panel" class="glass-panel">
+        <div id="launch-status">Checking AR support...</div>
+        <div id="launch-details">Open this game on a supported Android ARCore phone in Chrome over HTTPS.</div>
+        <div id="launch-actions">
+            <button id="custom-ar-button" class="launch-btn" disabled>CHECKING AR</button>
+        </div>
+    </div>
+
+    <button id="reset-ar-button" class="control-btn" aria-label="Reset / Recenter">
+        <span class="control-icon">⌖</span>
     </button>
     
     <!-- Audio -->
@@ -469,9 +573,6 @@
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
     <audio id="audio-lineclear" src="music/lineclear.mp3" preload="auto" playsinline></audio>
-    <!-- TOOT Sound -->
-    <audio id="audio-toot" src="data:audio/wav;base64,UklGRl9vT1ZYXxcqU1qa..." preload="auto" playsinline></audio>
-
     <!-- Three.js -->
     <script type="importmap">
         {
@@ -484,7 +585,6 @@
     
     <script type="module">
         import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
         
         // --- Global Variables ---
         let camera, scene, renderer;
@@ -494,9 +594,15 @@
         let gameBoard = null; 
         let currentPiece = null;
         let gameLoopInterval = null;
+        let xrSession = null;
+        let xrVisibilityPaused = false;
+        let fallbackMode = false;
+        let lastRecorderMimeType = 'video/webm';
+        const capabilityStatus = { secure: false, webgl: false, xr: false, immersiveAR: false, camera: 'unknown', supportsAR: false };
         
         // UI Vars
-        let customArButton, messageBox, messageText, phoneIcon, deviceNote;
+        let customArButton, fallback3DButton, resetArButton, launchPanel, launchStatus, launchDetails;
+        let messageBox, messageText, phoneIcon, deviceNote;
         let hudPanel, scoreVal, levelVal;
         let gameOverCard, goScore, goLevel, replayButton;
         let musicToggleBtn, musicIcon;
@@ -527,8 +633,11 @@
         // --- Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
-        let currentDropSpeed = 1000; 
-        const MIN_DROP_SPEED = 100; 
+        const INITIAL_DROP_SPEED = 500;
+        let currentDropSpeed = INITIAL_DROP_SPEED; 
+        const MIN_DROP_SPEED = 80; 
+        const SPEED_LEVEL_MULTIPLIER = 0.82;
+        let isStartSequenceRunning = false;
 
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20; 
@@ -548,6 +657,26 @@
         const COLORS = {
             1: 0x00F0F0, 2: 0xF0F000, 3: 0xA000F0, 4: 0x00F000, 5: 0xF00000, 6: 0x0000F0, 7: 0xF0A000,
         };
+        const sharedBlockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
+        const sharedEdgeGeo = new THREE.EdgesGeometry(sharedBlockGeo);
+        const sharedEdgeMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+        const sharedBlockMats = {};
+        function getBlockMaterial(colorIndex) {
+            if (!sharedBlockMats[colorIndex]) {
+                sharedBlockMats[colorIndex] = new THREE.MeshStandardMaterial({
+                    color: COLORS[colorIndex],
+                    roughness: 0.5,
+                    metalness: 0.1
+                });
+            }
+            return sharedBlockMats[colorIndex];
+        }
+        function createTetrisBlock(colorIndex) {
+            const block = new THREE.Mesh(sharedBlockGeo, getBlockMaterial(colorIndex));
+            const bevel = new THREE.LineSegments(sharedEdgeGeo, sharedEdgeMat);
+            block.add(bevel);
+            return block;
+        }
 
         let moveSound, gameOverSound, lineClearSound;
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -652,6 +781,299 @@
         
         init();
 
+        function setLaunchStatus(status, details = '') {
+            if (launchStatus) launchStatus.textContent = status;
+            if (launchDetails && details) launchDetails.textContent = details;
+        }
+
+        function checkWebGLSupport() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && (canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function getCameraPermissionState() {
+            if (!navigator.permissions || !navigator.permissions.query) return 'unknown';
+            try {
+                const status = await navigator.permissions.query({ name: 'camera' });
+                return status.state || 'unknown';
+            } catch (e) {
+                return 'unknown';
+            }
+        }
+
+        function isLikelyMobilePhoneOrTablet() {
+            const uaMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+            const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+            const smallViewport = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 900;
+            return uaMobile || (coarsePointer && smallViewport);
+        }
+
+        async function runCapabilityChecks() {
+            const mobileCandidate = isLikelyMobilePhoneOrTablet();
+            capabilityStatus.secure = window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            capabilityStatus.webgl = checkWebGLSupport();
+            capabilityStatus.xr = !!navigator.xr;
+            capabilityStatus.camera = await getCameraPermissionState();
+            capabilityStatus.immersiveAR = false;
+            capabilityStatus.supportsAR = false;
+
+            if (!mobileCandidate) {
+                setLaunchStatus(
+                    'Open on supported phone',
+                    'Use Android Chrome with ARCore over HTTPS. Desktop/laptop keyboard and 3D fallback modes are intentionally disabled.'
+                );
+            } else if (!capabilityStatus.secure) {
+                setLaunchStatus(
+                    'HTTPS required for mobile AR',
+                    'Serve this game from HTTPS, then open it on a supported Android ARCore phone in Chrome. Localhost is acceptable only for development testing.'
+                );
+            } else if (!capabilityStatus.webgl) {
+                setLaunchStatus(
+                    'WebGL is unavailable',
+                    'This mobile browser cannot render the AR game. Try a supported Android phone with Chrome and ARCore.'
+                );
+            } else if (!capabilityStatus.xr) {
+                setLaunchStatus(
+                    'Mobile WebXR AR unavailable',
+                    'This browser does not expose navigator.xr. Open on supported Android Chrome with ARCore. This build does not include desktop or 3D fallback gameplay.'
+                );
+            } else {
+                try {
+                    capabilityStatus.immersiveAR = await navigator.xr.isSessionSupported('immersive-ar');
+                } catch (e) {
+                    capabilityStatus.immersiveAR = false;
+                    console.warn('immersive-ar support check failed:', e);
+                }
+
+                if (capabilityStatus.immersiveAR) {
+                    capabilityStatus.supportsAR = true;
+                    setLaunchStatus('AR ready', `Camera permission: ${capabilityStatus.camera}. Tap Start AR and scan a floor.`);
+                } else {
+                    setLaunchStatus(
+                        'Mobile AR not supported here',
+                        'This phone/browser does not support WebXR immersive-ar. Desktop, keyboard, and non-AR fallback gameplay are intentionally disabled.'
+                    );
+                }
+            }
+
+            if (customArButton) {
+                customArButton.disabled = !capabilityStatus.supportsAR;
+                customArButton.textContent = capabilityStatus.supportsAR ? 'START AR' : 'MOBILE AR ONLY';
+            }
+            if (fallback3DButton) {
+                fallback3DButton.style.display = 'none';
+            }
+        }
+
+        function unlockAudio() {
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+            const allSounds = [bgmElement, gameOverSound, lineClearSound, moveSound];
+            allSounds.forEach(s => {
+                if (!s) return;
+                try {
+                    const p = s.play();
+                    if (p !== undefined) {
+                        p.then(() => {
+                            if (s === bgmElement) {
+                                s.volume = 0.05;
+                            } else {
+                                s.pause();
+                                s.currentTime = 0;
+                            }
+                        }).catch(() => {});
+                    }
+                } catch (e) {}
+            });
+            audioUnlocked = true;
+        }
+
+        function preloadAudioStatus() {
+            const assets = [bgmElement, moveSound, gameOverSound, lineClearSound].filter(Boolean);
+            if (!assets.length || !launchDetails) return;
+            let completed = 0;
+            const update = () => {
+                const base = launchDetails.textContent.split(' Audio:')[0];
+                launchDetails.textContent = `${base} Audio: ${completed}/${assets.length} ready.`;
+            };
+            assets.forEach(audio => {
+                const done = () => { completed++; update(); };
+                if (audio.readyState >= 3) {
+                    done();
+                } else {
+                    audio.addEventListener('canplaythrough', done, { once: true });
+                    audio.addEventListener('error', done, { once: true });
+                }
+            });
+            update();
+        }
+
+        async function startARSession() {
+            await runCapabilityChecks();
+            if (!capabilityStatus.supportsAR) {
+                setLaunchStatus('AR launch blocked by capability check', 'Open this game on a supported Android ARCore phone in Chrome over HTTPS.');
+                return;
+            }
+
+            unlockAudio();
+            triggerHaptic(5);
+            customArButton.disabled = true;
+            customArButton.textContent = 'STARTING AR';
+            setLaunchStatus('Starting AR...', 'Approve camera / motion permission if the browser asks.');
+
+            try {
+                renderer.xr.setReferenceSpaceType('local');
+                let session;
+                try {
+                    session = await navigator.xr.requestSession('immersive-ar', {
+                        requiredFeatures: ['hit-test'],
+                        optionalFeatures: ['dom-overlay', 'local-floor'],
+                        domOverlay: { root: document.body }
+                    });
+                } catch (firstError) {
+                    console.warn('AR session with DOM overlay failed, retrying without overlay:', firstError);
+                    session = await navigator.xr.requestSession('immersive-ar', {
+                        requiredFeatures: ['hit-test'],
+                        optionalFeatures: ['local-floor']
+                    });
+                }
+
+                xrSession = session;
+                xrSession.addEventListener('end', onXRSessionEnded, { once: true });
+                xrSession.addEventListener('visibilitychange', () => {
+                    if (xrSession.visibilityState === 'hidden' && gameState === GAME_STATE.PLAYING) {
+                        pauseGameForVisibility();
+                    } else if (xrVisibilityPaused) {
+                        resumeGameFromVisibility();
+                    }
+                });
+
+                await renderer.xr.setSession(session);
+                await onXRSessionStarted(session);
+            } catch (e) {
+                console.error('AR session start failed:', e);
+                customArButton.disabled = false;
+                customArButton.textContent = 'START AR';
+                setLaunchStatus('AR start failed', `${e.name || 'Error'}: ${e.message || 'Permission denied or AR session unavailable.'}`);
+            }
+        }
+
+        async function onXRSessionStarted(session) {
+            fallbackMode = false;
+            if (moveSound) moveSound.volume = 0.08;
+            if (lineClearSound) lineClearSound.volume = 0.08;
+            if (gameOverSound) gameOverSound.volume = 0.08;
+            if (!isMusicMuted) startBGM();
+
+            if (launchPanel) launchPanel.style.display = 'none';
+            if (recordButton) recordButton.style.display = 'flex';
+            if (resetArButton) resetArButton.style.display = 'flex';
+            gameState = GAME_STATE.SCANNING;
+            updateMessage('Scan floor to start', true);
+
+            try {
+                const viewerSpace = await session.requestReferenceSpace('viewer');
+                hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+            } catch (e) {
+                console.error('Hit-test setup failed:', e);
+                updateMessage('AR started, but floor detection failed');
+            }
+        }
+
+        function onXRSessionEnded() {
+            stopBGM();
+            if (isRecording) stopRecording();
+            if (hitTestSource && typeof hitTestSource.cancel === 'function') hitTestSource.cancel();
+            hitTestSource = null;
+            xrSession = null;
+            fallbackMode = false;
+            xrVisibilityPaused = false;
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
+            gameState = GAME_STATE.INITIALIZING;
+            if (recordButton) recordButton.style.display = 'none';
+            if (resetArButton) resetArButton.style.display = 'none';
+            if (hudPanel) hudPanel.style.opacity = '0';
+            if (gameOverCard) gameOverCard.style.display = 'none';
+            updateMessage('', false);
+            placementGrid.visible = false;
+            if (gameBoard) scene.remove(gameBoard);
+            gameBoard = new THREE.Group();
+            grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+            currentPiece = null;
+            isStartSequenceRunning = false;
+            score = 0;
+            level = 1;
+            linesClearedTotal = 0;
+            currentDropSpeed = INITIAL_DROP_SPEED;
+            if (launchPanel) launchPanel.style.display = 'flex';
+            runCapabilityChecks();
+        }
+
+        function pauseGameForVisibility() {
+            if (gameState !== GAME_STATE.PLAYING) return;
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
+            gameState = GAME_STATE.PAUSED;
+            xrVisibilityPaused = true;
+            updateMessage('Paused');
+        }
+
+        function resumeGameFromVisibility() {
+            if (!xrVisibilityPaused) return;
+            xrVisibilityPaused = false;
+            updateMessage('', false);
+            if (currentPiece) {
+                gameState = GAME_STATE.PLAYING;
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+            }
+        }
+
+        function runStartIntro() {
+            if (!isStartSequenceRunning) isStartSequenceRunning = true;
+            gameState = GAME_STATE.PAUSED;
+            placementGrid.visible = false;
+            introScreen.style.display = 'flex';
+            setTimeout(() => { introScreen.style.opacity = '1'; }, 50);
+            setTimeout(() => {
+                introScreen.style.opacity = '0';
+                setTimeout(() => {
+                    introScreen.style.display = 'none';
+                    startGame();
+                }, 500);
+            }, 900);
+        }
+
+        function startFallback3D() {
+            fallbackMode = true;
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
+            if (gameBoard) scene.remove(gameBoard);
+            gameBoard = new THREE.Group();
+            grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+            currentPiece = null;
+            isStartSequenceRunning = false;
+            score = 0;
+            level = 1;
+            linesClearedTotal = 0;
+            currentDropSpeed = INITIAL_DROP_SPEED;
+            gameOverCard.style.display = 'none';
+            placementGrid.visible = false;
+            gameBoard.position.set(0, 1.1, -1.45);
+            gameBoard.rotation.set(0, 0, 0);
+            scene.add(gameBoard);
+            if (launchPanel) launchPanel.style.display = 'none';
+            if (recordButton) recordButton.style.display = 'none';
+            if (resetArButton) resetArButton.style.display = 'flex';
+            if (!isMusicMuted) startBGM();
+            updateMessage('Mobile AR controls: tap/trigger to place, touch zones move, middle tap rotates, swipe down drops', false);
+            runStartIntro();
+        }
+
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
@@ -663,8 +1085,8 @@
             directionalLight.position.set(0, 10, 0);
             scene.add(directionalLight);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
@@ -680,6 +1102,11 @@
 
             // Bind UI Elements
             customArButton = document.getElementById('custom-ar-button');
+            fallback3DButton = document.getElementById('fallback-3d-button');
+            resetArButton = document.getElementById('reset-ar-button');
+            launchPanel = document.getElementById('launch-panel');
+            launchStatus = document.getElementById('launch-status');
+            launchDetails = document.getElementById('launch-details');
             deviceNote = document.getElementById('device-note');
             
             messageBox = document.getElementById('message-box');
@@ -713,41 +1140,18 @@
             gameOverSound = document.getElementById('audio-gameover');
             lineClearSound = document.getElementById('audio-lineclear');
 
-            const arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['hit-test'], 
-                optionalFeatures: ['dom-overlay', 'local-floor'], 
-                domOverlay: { root: document.body }
+            // Strict capability-gated launch. Do not expose AR launch until immersive-ar is confirmed.
+            customArButton.addEventListener('click', async () => {
+                await startARSession();
             });
-            arButton.id = "default-ar-button"; 
-            document.body.appendChild(arButton);
 
-            // --- STRICT AUDIO UNLOCK ON CLICK ---
-            customArButton.addEventListener('click', () => {
-                console.log("Unlocking audio context...");
-                if(audioCtx.state === 'suspended') audioCtx.resume();
-                triggerHaptic(5); 
-                
-                const allSounds = [bgmElement, gameOverSound, lineClearSound];
-                
-                allSounds.forEach(s => {
-                    if(s) {
-                        const p = s.play();
-                        if (p !== undefined) {
-                            p.then(() => {
-                                // If BGM loaded, set low volume
-                                if (s === bgmElement) {
-                                    s.volume = 0.05; // Set low gain
-                                } else {
-                                    s.pause();
-                                    s.currentTime = 0;
-                                }
-                            }).catch(e => console.warn("Audio play failed (user must interact first)", e));
-                        }
-                    }
-                });
-                
-                audioUnlocked = true;
-                arButton.click(); 
+            if (fallback3DButton) {
+                fallback3DButton.style.display = 'none';
+            }
+
+            resetArButton.addEventListener('click', () => {
+                triggerHaptic(10);
+                resetGame();
             });
             
             replayButton.addEventListener('click', () => {
@@ -771,44 +1175,18 @@
                 }
             });
 
-            renderer.xr.addEventListener('sessionstart', () => {
-                if (gameState === GAME_STATE.INITIALIZING) {
-                    // Volume Settings
-                    if (moveSound) moveSound.volume = 0.08; 
-                    if (lineClearSound) lineClearSound.volume = 0.08; 
-                    if (gameOverSound) gameOverSound.volume = 0.08; 
-
-                    if (!isMusicMuted) {
-                        startBGM(); // Use HTML audio element
-                    }
-                    
-                    customArButton.style.display = 'none';
-                    deviceNote.style.display = 'none'; // Hide the note when in AR
-                    // Show Controls
-                    recordButton.style.display = 'flex';
-                    
-                    gameState = GAME_STATE.SCANNING;
-                    updateMessage("Scan floor to start", true); // Show icon
-
-                    const currentSession = renderer.xr.getSession();
-                    currentSession.requestReferenceSpace('viewer').then((referenceSpace) => {
-                        currentSession.requestHitTestSource({ 
-                            space: referenceSpace 
-                        }).then((source) => {
-                            hitTestSource = source;
-                        });
-                    });
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden && gameState === GAME_STATE.PLAYING) {
+                    pauseGameForVisibility();
+                } else if (!document.hidden && xrVisibilityPaused) {
+                    resumeGameFromVisibility();
                 }
             });
-            
-            renderer.xr.addEventListener('sessionend', () => {
-                stopBGM();
-                if (isRecording) stopRecording();
-                recordButton.style.display = 'none';
-                window.location.reload();
-            });
 
-            // Touch Controls (Mobile fallback)
+            runCapabilityChecks();
+            preloadAudioStatus();
+
+            // Touch Controls (Mobile AR placement/gameplay)
             let touchStartX, touchStartY, touchStartTime;
             let isDragging = false;
             let lastTouchActionTime = 0;
@@ -942,6 +1320,7 @@
 
             for (const source of session.inputSources) {
                 if (source.gamepad) {
+                    if (!currentPiece || gameState !== GAME_STATE.PLAYING) continue;
                     const gamepad = source.gamepad;
                     
                     // Standard WebXR Gamepad Mapping
@@ -997,7 +1376,7 @@
 
         function resetRecordingUI() {
             if (recordButton) recordButton.classList.remove('recording');
-            if (iconRecord) iconRecord.textContent = "fiber_manual_record";
+            if (iconRecord) iconRecord.textContent = "●";
             if (recordingPanel) recordingPanel.style.display = 'none';
             if (recTimer) recTimer.textContent = "00:00";
         }
@@ -1026,6 +1405,7 @@
             }
 
             const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+            lastRecorderMimeType = mimeType;
             try {
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
             } catch (e) {
@@ -1041,7 +1421,7 @@
             isRecording = true;
             
             if (recordButton) recordButton.classList.add('recording');
-            if (iconRecord) iconRecord.textContent = "stop"; // Change material icon text to stop
+            if (iconRecord) iconRecord.textContent = "■";
             if (recordingPanel) recordingPanel.style.display = 'flex';
             
             // Start timer
@@ -1065,8 +1445,9 @@
         }
 
         function saveAndShareVideo() {
-            const blob = new Blob(recordedChunks, { type: 'video/mp4' }); 
-            const file = new File([blob], "ar-tetris-gameplay.mp4", { type: 'video/mp4' });
+            const extension = lastRecorderMimeType.includes('mp4') ? 'mp4' : 'webm';
+            const blob = new Blob(recordedChunks, { type: lastRecorderMimeType }); 
+            const file = new File([blob], `ar-tetris-gameplay.${extension}`, { type: lastRecorderMimeType });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 navigator.share({
@@ -1087,7 +1468,7 @@
             document.body.appendChild(a);
             a.style = 'display: none';
             a.href = url;
-            a.download = 'ar-tetris-gameplay.mp4';
+            a.download = `ar-tetris-gameplay.${lastRecorderMimeType.includes('mp4') ? 'mp4' : 'webm'}`;
             a.click();
             window.URL.revokeObjectURL(url);
             updateMessage("Video downloaded!", true);
@@ -1099,12 +1480,12 @@
             if (isMusicMuted) {
                 // Unmute/start BGM
                 startBGM();
-                musicIcon.textContent = "volume_up";
+                musicIcon.textContent = "♪";
                 isMusicMuted = false;
             } else {
                 // Mute/stop BGM
                 stopBGM();
-                musicIcon.textContent = "volume_off";
+                musicIcon.textContent = "×";
                 isMusicMuted = true;
             }
         }
@@ -1188,55 +1569,71 @@
         }
 
         function playIntroAndStart() {
-            const depthOffset = -0.5; 
-            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE; 
+            if (isStartSequenceRunning || gameState !== GAME_STATE.PLACING) return;
+
+            if (!placementGrid.visible && !fallbackMode) {
+                updateMessage('Keep scanning until the floor reticle appears', true);
+                return;
+            }
+
+            isStartSequenceRunning = true;
+            gameState = GAME_STATE.PAUSED;
+
+            const depthOffset = -0.5;
+            const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE;
 
             const targetPos = new THREE.Vector3();
             targetPos.setFromMatrixPosition(placementGrid.matrix);
             gameBoard.position.copy(targetPos);
-            
+
             const cameraPos = new THREE.Vector3();
             camera.getWorldPosition(cameraPos);
             gameBoard.lookAt(cameraPos.x, gameBoard.position.y, cameraPos.z);
-            
-            // Treat floor as a bit lower (-0.15m)
-            gameBoard.translateY(baseLift - 0.15); 
-            gameBoard.translateZ(depthOffset);
-            
-            scene.add(gameBoard);
-            placementGrid.visible = false; 
-            
-            introScreen.style.display = 'flex';
-            
-            setTimeout(() => {
-                introScreen.style.opacity = '1';
-            }, 50); 
 
-            setTimeout(() => {
-                introScreen.style.opacity = '0';
-                
-                setTimeout(() => {
-                    introScreen.style.display = 'none';
-                    startGame();
-                }, 500); 
-                
-            }, 2500); 
+            // Lift board from the detected floor and place it slightly in front of the reticle.
+            gameBoard.translateY(baseLift - 0.15);
+            gameBoard.translateZ(depthOffset);
+
+            if (!gameBoard.parent) scene.add(gameBoard);
+            updateMessage('', false);
+            runStartIntro();
         }
 
         function startGame() {
+            if (gameState === GAME_STATE.PLAYING && currentPiece) return;
+
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
+
+            // Hard reset the board before the first piece spawns.
+            // This prevents duplicate intro taps from leaving a frozen orphan piece at the top.
+            if (gameBoard) {
+                for (let i = gameBoard.children.length - 1; i >= 0; i--) {
+                    gameBoard.remove(gameBoard.children[i]);
+                }
+            }
+
+            grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+            currentPiece = null;
+            score = 0;
+            linesClearedTotal = 0;
+            level = 1;
+            currentDropSpeed = INITIAL_DROP_SPEED;
+            isStartSequenceRunning = false;
+
             gameState = GAME_STATE.PLAYING;
-            hudPanel.style.opacity = '1'; // Show HUD
+            hudPanel.style.opacity = '1';
+            if (resetArButton) resetArButton.style.display = 'flex';
             updateScore(0);
-            
             placementGrid.visible = false;
 
             spawnPiece();
-            
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+            if (gameState === GAME_STATE.PLAYING && currentPiece) {
+                gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+            }
         }
 
         function gameTick() {
-            // FIXED: STRICT CHECK TO STOP TICK IF GAME OVER
             if (gameState !== GAME_STATE.PLAYING) return;
 
             if (!currentPiece) return;
@@ -1244,8 +1641,8 @@
                 currentPiece.userData.gridPos.y += 1;
                 updatePiecePosition(currentPiece);
             } else {
-                lockPiece();
-                spawnPiece();
+                const isClearing = lockPiece();
+                if (!isClearing && gameState === GAME_STATE.PLAYING) spawnPiece();
             }
         }
         
@@ -1285,10 +1682,12 @@
             gameBoard = new THREE.Group(); 
 
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
+            currentPiece = null;
             score = 0;
             linesClearedTotal = 0;
             level = 1;
-            currentDropSpeed = 1000;
+            currentDropSpeed = INITIAL_DROP_SPEED;
+            isStartSequenceRunning = false;
             
             // Hide HUD
             hudPanel.style.opacity = '0';
@@ -1298,10 +1697,15 @@
                 startBGM();
             }
 
-            // Reset to SCANNING state
-            gameState = GAME_STATE.SCANNING;
-            updateMessage("Scan floor to start", true);
-            placementGrid.visible = false; 
+            if (renderer.xr.getSession()) {
+                // Reset to AR scanning state
+                gameState = GAME_STATE.SCANNING;
+                updateMessage("Scan floor to start", true);
+                placementGrid.visible = false; 
+            } else {
+                // Recenter active scene in front of the camera when needed.
+                startFallback3D();
+            }
         }
 
         function updateScore(linesCleared) {
@@ -1315,10 +1719,7 @@
                 if (newLevel > level) {
                     level = newLevel;
                     levelVal.textContent = level;
-                    currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
-                    
-                    clearInterval(gameLoopInterval);
-                    gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                    currentDropSpeed = Math.max(MIN_DROP_SPEED, Math.floor(currentDropSpeed * SPEED_LEVEL_MULTIPLIER));
                 }
 
                 playSound(lineClearSound);
@@ -1416,15 +1817,25 @@
                         });
                         
                         updateScore(linesCleared);
-                        
+
+                        // Spawn only after the clear animation finishes, so no orphan piece appears at the top.
+                        if (gameState === GAME_STATE.PLAYING) {
+                            spawnPiece();
+                        }
+
                         // Resume Game
-                        gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                        if (gameState === GAME_STATE.PLAYING && currentPiece) {
+                            clearInterval(gameLoopInterval);
+                            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                        }
                     }
                 }
                 // Start animation loop using precise time measurement
                 lastTimestamp = performance.now();
                 requestAnimationFrame(animateClear);
+                return true;
             }
+            return false;
         }
 
         function movePiece(direction) {
@@ -1476,22 +1887,15 @@
             }
 
 
-            const color = COLORS[typeIndex + 1];
+            const colorIndex = typeIndex + 1;
             
             const piece = new THREE.Group();
             piece.userData = { shape: shape, typeIndex: typeIndex, rotationIndex: rotationIndex, gridPos: { x: Math.floor((BOARD_WIDTH - shape[0].length) / 2), y: 0 } };
             
-            const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-            const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-            const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-            const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-            
             for (let y = 0; y < shape.length; y++) {
                 for (let x = 0; x < shape[y].length; x++) {
                     if (shape[y][x]) {
-                        const block = new THREE.Mesh(blockGeo, blockMat);
-                        const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                        block.add(bevel);
+                        const block = createTetrisBlock(colorIndex);
                         block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
                         piece.add(block);
                     }
@@ -1516,18 +1920,12 @@
                     ud.gridPos.x = testPos.x; 
                     while (currentPiece.children.length) currentPiece.remove(currentPiece.children[0]);
                     
-                    const color = COLORS[ud.typeIndex + 1];
-                    const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-                    const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-                    const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-                    const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+                    const colorIndex = ud.typeIndex + 1;
             
                     for (let y = 0; y < newShape.length; y++) {
                         for (let x = 0; x < newShape[y].length; x++) {
                             if (newShape[y][x]) {
-                                const block = new THREE.Mesh(blockGeo, blockMat);
-                                const bevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                                block.add(bevel);
+                                const block = createTetrisBlock(colorIndex);
                                 block.position.set(x * BLOCK_SIZE, -y * BLOCK_SIZE, 0);
                                 currentPiece.add(block);
                             }
@@ -1543,15 +1941,17 @@
         }
         
         function hardDrop() {
-            if (!currentPiece) return;
+            if (!currentPiece || gameState !== GAME_STATE.PLAYING) return;
             while (isValidMove(currentPiece, { y: 1 })) {
                 currentPiece.userData.gridPos.y += 1;
             }
             updatePiecePosition(currentPiece);
-            lockPiece();
-            spawnPiece();
-            clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
+            const isClearing = lockPiece();
+            if (!isClearing && gameState === GAME_STATE.PLAYING) {
+                spawnPiece();
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+            }
             triggerHaptic(20); 
         }
 
@@ -1589,14 +1989,7 @@
                         if (boardY < 0 || boardY >= BOARD_HEIGHT) continue; 
                         grid[boardY][boardX] = ud.typeIndex + 1;
                         
-                        const color = COLORS[ud.typeIndex + 1];
-                        const blockGeo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE * 0.8);
-                        const blockMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5, metalness: 0.1 });
-                        const bevelGeo = new THREE.EdgesGeometry(blockGeo);
-                        const bevelMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-                        const newBlock = new THREE.Mesh(blockGeo, blockMat);
-                        const newBevel = new THREE.LineSegments(bevelGeo, bevelMat);
-                        newBlock.add(newBevel);
+                        const newBlock = createTetrisBlock(ud.typeIndex + 1);
                         
                         newBlock.position.set(
                             (boardX - BOARD_WIDTH / 2 + 0.5) * BLOCK_SIZE,
@@ -1609,7 +2002,7 @@
             }
             gameBoard.remove(currentPiece);
             currentPiece = null;
-            checkLineClears();
+            return checkLineClears();
         }
 
         function base64ToArrayBuffer(base64) {

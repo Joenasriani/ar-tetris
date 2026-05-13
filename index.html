@@ -617,18 +617,20 @@
             INITIALIZING: 0,
             SCANNING: 1,
             PLACING: 2,
-            PLAYING: 3,
-            GAME_OVER: 4,
-            PAUSED: 5 // Added for animation
+            STARTING: 3,
+            PLAYING: 4,
+            GAME_OVER: 5,
+            PAUSED: 6
         };
         let gameState = GAME_STATE.INITIALIZING;
+        let startInProgress = false;
         let score = 0;
         
         // --- Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
-        let currentDropSpeed = 1000; 
-        const MIN_DROP_SPEED = 100; 
+        let currentDropSpeed = 500; 
+        const MIN_DROP_SPEED = 80; 
 
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20; 
@@ -982,6 +984,7 @@
             xrSession = null;
             fallbackMode = false;
             xrVisibilityPaused = false;
+            startInProgress = false;
             clearInterval(gameLoopInterval);
             gameLoopInterval = null;
             gameState = GAME_STATE.INITIALIZING;
@@ -998,7 +1001,7 @@
             score = 0;
             level = 1;
             linesClearedTotal = 0;
-            currentDropSpeed = 1000;
+            currentDropSpeed = 500;
             if (launchPanel) launchPanel.style.display = 'flex';
             runCapabilityChecks();
         }
@@ -1024,6 +1027,11 @@
         }
 
         function runStartIntro() {
+            if (startInProgress || gameState === GAME_STATE.PLAYING) return;
+            startInProgress = true;
+            gameState = GAME_STATE.STARTING;
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
             placementGrid.visible = false;
             introScreen.style.display = 'flex';
             setTimeout(() => { introScreen.style.opacity = '1'; }, 50);
@@ -1047,7 +1055,7 @@
             score = 0;
             level = 1;
             linesClearedTotal = 0;
-            currentDropSpeed = 1000;
+            currentDropSpeed = 500;
             gameOverCard.style.display = 'none';
             placementGrid.visible = false;
             gameBoard.position.set(0, 1.1, -1.45);
@@ -1599,6 +1607,13 @@
         }
 
         function playIntroAndStart() {
+            if (startInProgress || gameState === GAME_STATE.STARTING || gameState === GAME_STATE.PLAYING) return;
+
+            if (!fallbackMode && gameState !== GAME_STATE.PLACING) {
+                updateMessage('Keep scanning until the floor reticle appears', true);
+                return;
+            }
+
             if (!placementGrid.visible && !fallbackMode) {
                 updateMessage('Keep scanning until the floor reticle appears', true);
                 return;
@@ -1626,8 +1641,19 @@
 
         function startGame() {
             clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
+
+            // Defensive cleanup: if any earlier duplicate intro/start created an active piece,
+            // remove it before spawning the real first playable piece. This prevents the
+            // visible orphan block group that looked stuck at the top of the board.
+            if (currentPiece) {
+                gameBoard.remove(currentPiece);
+                currentPiece = null;
+            }
+
+            startInProgress = false;
             gameState = GAME_STATE.PLAYING;
-            hudPanel.style.opacity = '1'; // Show HUD
+            hudPanel.style.opacity = '1';
             if (resetArButton) resetArButton.style.display = 'flex';
             updateScore(0);
             
@@ -1647,8 +1673,8 @@
                 currentPiece.userData.gridPos.y += 1;
                 updatePiecePosition(currentPiece);
             } else {
-                lockPiece();
-                spawnPiece();
+                const lineClearStarted = lockPiece();
+                if (!lineClearStarted) spawnPiece();
             }
         }
         
@@ -1678,6 +1704,7 @@
                 gameOverSound.currentTime = 0;
             }
 
+            startInProgress = false;
             gameOverCard.style.display = 'none';
             
             for (let i = gameBoard.children.length - 1; i >= 0; i--) {
@@ -1691,7 +1718,7 @@
             score = 0;
             linesClearedTotal = 0;
             level = 1;
-            currentDropSpeed = 1000;
+            currentDropSpeed = 500;
             
             // Hide HUD
             hudPanel.style.opacity = '0';
@@ -1723,7 +1750,7 @@
                 if (newLevel > level) {
                     level = newLevel;
                     levelVal.textContent = level;
-                    currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
+                    currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.82);
                     
                     clearInterval(gameLoopInterval);
                     gameLoopInterval = setInterval(gameTick, currentDropSpeed);
@@ -1825,14 +1852,21 @@
                         
                         updateScore(linesCleared);
                         
-                        // Resume Game
-                        gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                        // Spawn the next piece only after the line-clear animation has fully finished.
+                        // This prevents a new active piece from sitting at the top while old rows animate.
+                        if (gameState === GAME_STATE.PLAYING) {
+                            spawnPiece();
+                            clearInterval(gameLoopInterval);
+                            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+                        }
                     }
                 }
                 // Start animation loop using precise time measurement
                 lastTimestamp = performance.now();
                 requestAnimationFrame(animateClear);
+                return true;
             }
+            return false;
         }
 
         function movePiece(direction) {
@@ -1855,8 +1889,14 @@
         }
 
         function spawnPiece() {
-            // FIXED: CRITICAL CHECK TO PREVENT STUCK PIECES ON GAME OVER
+            // Only one active piece may exist. If a bad re-entry or duplicate call tries to spawn
+            // while another active piece exists, remove the old active group first instead of
+            // leaving it orphaned at the spawn/top area.
             if (gameState !== GAME_STATE.PLAYING) return;
+            if (currentPiece) {
+                gameBoard.remove(currentPiece);
+                currentPiece = null;
+            }
 
             const typeIndex = Math.floor(Math.random() * SHAPES.length);
             const rotationIndex = 0; 
@@ -1938,15 +1978,17 @@
         }
         
         function hardDrop() {
-            if (!currentPiece) return;
+            if (!currentPiece || gameState !== GAME_STATE.PLAYING) return;
             while (isValidMove(currentPiece, { y: 1 })) {
                 currentPiece.userData.gridPos.y += 1;
             }
             updatePiecePosition(currentPiece);
-            lockPiece();
-            spawnPiece();
-            clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
+            const lineClearStarted = lockPiece();
+            if (!lineClearStarted) {
+                spawnPiece();
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = setInterval(gameTick, currentDropSpeed);
+            }
             triggerHaptic(20); 
         }
 
@@ -1997,7 +2039,7 @@
             }
             gameBoard.remove(currentPiece);
             currentPiece = null;
-            checkLineClears();
+            return checkLineClears();
         }
 
         function base64ToArrayBuffer(base64) {

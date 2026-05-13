@@ -9,6 +9,8 @@
     
     <!-- Load Google Font: Montserrat (Medium & Bold) -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Load Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
         /* Basic reset */
@@ -152,16 +154,8 @@
             transform: scale(0.95);
         }
         
-        .control-btn .control-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1em;
-            height: 1em;
+        .control-btn .material-icons-round {
             font-size: 24px;
-            line-height: 1;
-            font-weight: 800;
-            font-family: Arial, Helvetica, sans-serif;
         }
 
         #music-toggle {
@@ -190,7 +184,7 @@
             100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
         }
         
-        #record-button .control-icon {
+        #record-button .material-icons-round {
             color: white;
         }
 
@@ -512,7 +506,7 @@
 
     <!-- 5. Onboarding Message -->
     <div id="message-box" class="glass-panel">
-        <span class="phone-icon" aria-hidden="true">▯</span>
+        <span class="material-icons-round phone-icon">smartphone</span>
         <span id="message-text">Scan floor to start</span>
     </div>
 
@@ -530,7 +524,7 @@
             </div>
         </div>
         <button id="replay-button">
-            <span class="control-icon" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;">↻</span>
+            <span class="material-icons-round" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;">replay</span>
             Play Again
         </button>
     </div>
@@ -544,25 +538,25 @@
     <!-- 3. Consistent Icons -->
     <!-- Music Toggle -->
     <button id="music-toggle" class="control-btn" aria-label="Toggle Music">
-        <span class="control-icon" id="icon-music">♪</span>
+        <span class="material-icons-round" id="icon-music">volume_up</span>
     </button>
 
     <!-- Recording Button -->
     <button id="record-button" class="control-btn" aria-label="Record Video">
-        <span class="control-icon" id="icon-record-btn">●</span>
+        <span class="material-icons-round" id="icon-record-btn">fiber_manual_record</span>
     </button>
 
     <!-- Capability-gated launch panel -->
     <div id="launch-panel" class="glass-panel">
         <div id="launch-status">Checking AR support...</div>
-        <div id="launch-details">Open this game on a supported Android ARCore phone in Chrome over HTTPS.</div>
+        <div id="launch-details">This build is mobile AR only. Open it on a supported Android ARCore phone in Chrome over HTTPS.</div>
         <div id="launch-actions">
             <button id="custom-ar-button" class="launch-btn" disabled>CHECKING AR</button>
         </div>
     </div>
 
     <button id="reset-ar-button" class="control-btn" aria-label="Reset / Recenter">
-        <span class="control-icon">⌖</span>
+        <span class="material-icons-round">my_location</span>
     </button>
     
     <!-- Audio -->
@@ -633,11 +627,8 @@
         // --- Level Variables ---
         let level = 1;
         let linesClearedTotal = 0;
-        const INITIAL_DROP_SPEED = 500;
-        let currentDropSpeed = INITIAL_DROP_SPEED; 
-        const MIN_DROP_SPEED = 80; 
-        const SPEED_LEVEL_MULTIPLIER = 0.82;
-        let isStartSequenceRunning = false;
+        let currentDropSpeed = 1000; 
+        const MIN_DROP_SPEED = 100; 
 
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20; 
@@ -823,8 +814,8 @@
 
             if (!mobileCandidate) {
                 setLaunchStatus(
-                    'Open on supported phone',
-                    'Use Android Chrome with ARCore over HTTPS. Desktop/laptop keyboard and 3D fallback modes are intentionally disabled.'
+                    'Mobile AR only',
+                    'This version is designed for supported mobile AR phones. Open this link on Android Chrome with ARCore over HTTPS. Desktop/laptop keyboard and 3D fallback modes are intentionally disabled.'
                 );
             } else if (!capabilityStatus.secure) {
                 setLaunchStatus(
@@ -855,7 +846,7 @@
                 } else {
                     setLaunchStatus(
                         'Mobile AR not supported here',
-                        'This phone/browser does not support WebXR immersive-ar. Desktop, keyboard, and non-AR fallback gameplay are intentionally disabled.'
+                        'This phone/browser does not support WebXR immersive-ar. This build is mobile AR only and does not include desktop, keyboard, or non-AR fallback gameplay.'
                     );
                 }
             }
@@ -914,7 +905,7 @@
         async function startARSession() {
             await runCapabilityChecks();
             if (!capabilityStatus.supportsAR) {
-                setLaunchStatus('AR launch blocked by capability check', 'Open this game on a supported Android ARCore phone in Chrome over HTTPS.');
+                setLaunchStatus('AR launch blocked by capability check', 'This build is mobile AR only. Open it on a supported Android ARCore phone in Chrome over HTTPS.');
                 return;
             }
 
@@ -1004,11 +995,10 @@
             gameBoard = new THREE.Group();
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             currentPiece = null;
-            isStartSequenceRunning = false;
             score = 0;
             level = 1;
             linesClearedTotal = 0;
-            currentDropSpeed = INITIAL_DROP_SPEED;
+            currentDropSpeed = 1000;
             if (launchPanel) launchPanel.style.display = 'flex';
             runCapabilityChecks();
         }
@@ -1034,8 +1024,6 @@
         }
 
         function runStartIntro() {
-            if (!isStartSequenceRunning) isStartSequenceRunning = true;
-            gameState = GAME_STATE.PAUSED;
             placementGrid.visible = false;
             introScreen.style.display = 'flex';
             setTimeout(() => { introScreen.style.opacity = '1'; }, 50);
@@ -1045,7 +1033,7 @@
                     introScreen.style.display = 'none';
                     startGame();
                 }, 500);
-            }, 900);
+            }, 1200);
         }
 
         function startFallback3D() {
@@ -1056,11 +1044,10 @@
             gameBoard = new THREE.Group();
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             currentPiece = null;
-            isStartSequenceRunning = false;
             score = 0;
             level = 1;
             linesClearedTotal = 0;
-            currentDropSpeed = INITIAL_DROP_SPEED;
+            currentDropSpeed = 1000;
             gameOverCard.style.display = 'none';
             placementGrid.visible = false;
             gameBoard.position.set(0, 1.1, -1.45);
@@ -1070,7 +1057,7 @@
             if (recordButton) recordButton.style.display = 'none';
             if (resetArButton) resetArButton.style.display = 'flex';
             if (!isMusicMuted) startBGM();
-            updateMessage('Mobile AR controls: tap/trigger to place, touch zones move, middle tap rotates, swipe down drops', false);
+            updateMessage('Mobile AR controls: tap left/right to move, tap middle to rotate, swipe down to hard drop', false);
             runStartIntro();
         }
 
@@ -1186,18 +1173,32 @@
             runCapabilityChecks();
             preloadAudioStatus();
 
-            // Touch Controls (Mobile AR placement/gameplay)
-            let touchStartX, touchStartY, touchStartTime;
-            let isDragging = false;
+            // Touch Controls (Mobile AR gameplay)
+            // Contract:
+            // - Tap left third: move left only.
+            // - Tap right third: move right only.
+            // - Tap middle third: rotate only.
+            // - Swipe down from any zone: hard drop from the current position.
+            let touchStartX = null;
+            let touchStartY = null;
+            let touchStartTime = 0;
+            let touchActionCommitted = false;
             let lastTouchActionTime = 0;
-            const DRAG_THRESHOLD_Y = 60; // minimum vertical pixels for swipe detection (tuned for mobile)
-            const TOUCH_COOLDOWN_MS = 120; // debounce interval to prevent accidental double-taps
+            const TAP_MAX_DISTANCE = 28;
+            const TAP_MAX_TIME_MS = 320;
+            const HARD_DROP_SWIPE_Y = 70;
+            const SWIPE_DIRECTION_RATIO = 1.25;
+            const TOUCH_COOLDOWN_MS = 90;
 
             function getTouchZone(x) {
                 const third = window.innerWidth / 3;
                 if (x < third) return 'left';
                 if (x > third * 2) return 'right';
                 return 'mid';
+            }
+
+            function isGameplayTouchTarget(target) {
+                return !(target.tagName === 'BUTTON' || target.closest('.control-btn') || target.closest('#replay-button'));
             }
 
             function canTouchAct() {
@@ -1207,10 +1208,30 @@
                 return true;
             }
 
-            function onTouchStart(e) {
-                // Prevent interfering with buttons
-                if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn') || e.target.closest('#replay-button')) return;
+            function commitTouchAction(action) {
+                if (touchActionCommitted || !canTouchAct()) return;
+                touchActionCommitted = true;
 
+                if (action === 'left') {
+                    movePiece(-1);
+                } else if (action === 'right') {
+                    movePiece(1);
+                } else if (action === 'rotate') {
+                    rotatePiece();
+                } else if (action === 'hardDrop') {
+                    hardDrop();
+                }
+            }
+
+            function resetTouchState() {
+                touchStartX = null;
+                touchStartY = null;
+                touchStartTime = 0;
+                touchActionCommitted = false;
+            }
+
+            function onTouchStart(e) {
+                if (!isGameplayTouchTarget(e.target)) return;
                 e.preventDefault();
 
                 if (gameState === GAME_STATE.PLACING) {
@@ -1219,64 +1240,73 @@
                     return;
                 }
 
-                if (gameState !== GAME_STATE.PLAYING || e.touches.length > 1) return;
+                if (gameState !== GAME_STATE.PLAYING || e.touches.length !== 1) {
+                    resetTouchState();
+                    return;
+                }
 
                 const touch = e.touches[0];
                 touchStartX = touch.pageX;
                 touchStartY = touch.pageY;
                 touchStartTime = Date.now();
-                isDragging = false;
-
-                // Left/right zones: single tap move, no repeat
-                const zone = getTouchZone(touchStartX);
-                if (zone === 'left') {
-                    if (canTouchAct()) movePiece(-1);
-                    isDragging = true; // prevent rotate on touchend
-                } else if (zone === 'right') {
-                    if (canTouchAct()) movePiece(1);
-                    isDragging = true; // prevent rotate on touchend
-                }
-                // Middle zone: handled on touchend (tap) or touchmove (swipe)
+                touchActionCommitted = false;
             }
 
             function onTouchMove(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn')) return;
+                if (!isGameplayTouchTarget(e.target)) return;
                 e.preventDefault();
-                if (gameState !== GAME_STATE.PLAYING || touchStartY == null || e.touches.length > 1) return;
+                if (gameState !== GAME_STATE.PLAYING || touchStartY == null || e.touches.length !== 1) return;
 
                 const touch = e.touches[0];
+                const deltaX = touch.pageX - touchStartX;
                 const deltaY = touch.pageY - touchStartY;
-                const deltaX = Math.abs(touch.pageX - touchStartX);
+                const absX = Math.abs(deltaX);
+                const absY = Math.abs(deltaY);
 
-                // Middle zone only: swipe down triggers one soft drop step
-                if (!isDragging && getTouchZone(touchStartX) === 'mid' && deltaY > DRAG_THRESHOLD_Y && deltaY > deltaX) {
-                    if (canTouchAct()) {
-                        if (currentPiece && isValidMove(currentPiece, { y: 1 })) {
-                            currentPiece.userData.gridPos.y += 1;
-                            updatePiecePosition(currentPiece);
-                            score += 1;
-                            scoreVal.textContent = score;
-                        }
-                    }
-                    isDragging = true; // one step per gesture, no rotate on end
+                // Downward swipe from any screen zone: hard drop exactly once.
+                if (
+                    !touchActionCommitted &&
+                    deltaY >= HARD_DROP_SWIPE_Y &&
+                    absY >= absX * SWIPE_DIRECTION_RATIO
+                ) {
+                    commitTouchAction('hardDrop');
                 }
             }
 
             function onTouchEnd(e) {
-                if (e.target.tagName === 'BUTTON' || e.target.closest('.control-btn')) return;
+                if (!isGameplayTouchTarget(e.target)) return;
                 e.preventDefault();
-                if (gameState !== GAME_STATE.PLAYING) return;
+                if (gameState !== GAME_STATE.PLAYING || touchStartX == null || touchStartY == null) {
+                    resetTouchState();
+                    return;
+                }
 
-                // If this was a drag or side tap, ignore as a tap
-                if (isDragging) { isDragging = false; return; }
+                if (touchActionCommitted) {
+                    resetTouchState();
+                    return;
+                }
 
+                const touch = e.changedTouches && e.changedTouches.length ? e.changedTouches[0] : null;
+                const endX = touch ? touch.pageX : touchStartX;
+                const endY = touch ? touch.pageY : touchStartY;
+                const deltaX = endX - touchStartX;
+                const deltaY = endY - touchStartY;
+                const travel = Math.hypot(deltaX, deltaY);
                 const touchTime = Date.now() - touchStartTime;
 
-                // Quick middle tap => rotate
-                if (touchTime < 250 && getTouchZone(touchStartX) === 'mid') {
-                    if (canTouchAct()) rotatePiece();
+                // Only taps trigger left/right/rotate. No release-rotate after side taps.
+                if (touchTime <= TAP_MAX_TIME_MS && travel <= TAP_MAX_DISTANCE) {
+                    const zone = getTouchZone(touchStartX);
+                    if (zone === 'left') {
+                        commitTouchAction('left');
+                    } else if (zone === 'right') {
+                        commitTouchAction('right');
+                    } else {
+                        commitTouchAction('rotate');
+                    }
                 }
-                isDragging = false;
+
+                resetTouchState();
             }
 
             renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -1376,7 +1406,7 @@
 
         function resetRecordingUI() {
             if (recordButton) recordButton.classList.remove('recording');
-            if (iconRecord) iconRecord.textContent = "●";
+            if (iconRecord) iconRecord.textContent = "fiber_manual_record";
             if (recordingPanel) recordingPanel.style.display = 'none';
             if (recTimer) recTimer.textContent = "00:00";
         }
@@ -1421,7 +1451,7 @@
             isRecording = true;
             
             if (recordButton) recordButton.classList.add('recording');
-            if (iconRecord) iconRecord.textContent = "■";
+            if (iconRecord) iconRecord.textContent = "stop"; // Change material icon text to stop
             if (recordingPanel) recordingPanel.style.display = 'flex';
             
             // Start timer
@@ -1480,12 +1510,12 @@
             if (isMusicMuted) {
                 // Unmute/start BGM
                 startBGM();
-                musicIcon.textContent = "♪";
+                musicIcon.textContent = "volume_up";
                 isMusicMuted = false;
             } else {
                 // Mute/stop BGM
                 stopBGM();
-                musicIcon.textContent = "×";
+                musicIcon.textContent = "volume_off";
                 isMusicMuted = true;
             }
         }
@@ -1569,15 +1599,10 @@
         }
 
         function playIntroAndStart() {
-            if (isStartSequenceRunning || gameState !== GAME_STATE.PLACING) return;
-
             if (!placementGrid.visible && !fallbackMode) {
                 updateMessage('Keep scanning until the floor reticle appears', true);
                 return;
             }
-
-            isStartSequenceRunning = true;
-            gameState = GAME_STATE.PAUSED;
 
             const depthOffset = -0.5;
             const baseLift = (BOARD_HEIGHT / 2) * BLOCK_SIZE;
@@ -1600,40 +1625,21 @@
         }
 
         function startGame() {
-            if (gameState === GAME_STATE.PLAYING && currentPiece) return;
-
             clearInterval(gameLoopInterval);
-            gameLoopInterval = null;
-
-            // Hard reset the board before the first piece spawns.
-            // This prevents duplicate intro taps from leaving a frozen orphan piece at the top.
-            if (gameBoard) {
-                for (let i = gameBoard.children.length - 1; i >= 0; i--) {
-                    gameBoard.remove(gameBoard.children[i]);
-                }
-            }
-
-            grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
-            currentPiece = null;
-            score = 0;
-            linesClearedTotal = 0;
-            level = 1;
-            currentDropSpeed = INITIAL_DROP_SPEED;
-            isStartSequenceRunning = false;
-
             gameState = GAME_STATE.PLAYING;
-            hudPanel.style.opacity = '1';
+            hudPanel.style.opacity = '1'; // Show HUD
             if (resetArButton) resetArButton.style.display = 'flex';
             updateScore(0);
+            
             placementGrid.visible = false;
 
             spawnPiece();
-            if (gameState === GAME_STATE.PLAYING && currentPiece) {
-                gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-            }
+            
+            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
         }
 
         function gameTick() {
+            // FIXED: STRICT CHECK TO STOP TICK IF GAME OVER
             if (gameState !== GAME_STATE.PLAYING) return;
 
             if (!currentPiece) return;
@@ -1641,8 +1647,8 @@
                 currentPiece.userData.gridPos.y += 1;
                 updatePiecePosition(currentPiece);
             } else {
-                const isClearing = lockPiece();
-                if (!isClearing && gameState === GAME_STATE.PLAYING) spawnPiece();
+                lockPiece();
+                spawnPiece();
             }
         }
         
@@ -1682,12 +1688,10 @@
             gameBoard = new THREE.Group(); 
 
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
-            currentPiece = null;
             score = 0;
             linesClearedTotal = 0;
             level = 1;
-            currentDropSpeed = INITIAL_DROP_SPEED;
-            isStartSequenceRunning = false;
+            currentDropSpeed = 1000;
             
             // Hide HUD
             hudPanel.style.opacity = '0';
@@ -1719,7 +1723,10 @@
                 if (newLevel > level) {
                     level = newLevel;
                     levelVal.textContent = level;
-                    currentDropSpeed = Math.max(MIN_DROP_SPEED, Math.floor(currentDropSpeed * SPEED_LEVEL_MULTIPLIER));
+                    currentDropSpeed = Math.max(MIN_DROP_SPEED, currentDropSpeed * 0.9);
+                    
+                    clearInterval(gameLoopInterval);
+                    gameLoopInterval = setInterval(gameTick, currentDropSpeed);
                 }
 
                 playSound(lineClearSound);
@@ -1817,25 +1824,15 @@
                         });
                         
                         updateScore(linesCleared);
-
-                        // Spawn only after the clear animation finishes, so no orphan piece appears at the top.
-                        if (gameState === GAME_STATE.PLAYING) {
-                            spawnPiece();
-                        }
-
+                        
                         // Resume Game
-                        if (gameState === GAME_STATE.PLAYING && currentPiece) {
-                            clearInterval(gameLoopInterval);
-                            gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-                        }
+                        gameLoopInterval = setInterval(gameTick, currentDropSpeed);
                     }
                 }
                 // Start animation loop using precise time measurement
                 lastTimestamp = performance.now();
                 requestAnimationFrame(animateClear);
-                return true;
             }
-            return false;
         }
 
         function movePiece(direction) {
@@ -1941,17 +1938,15 @@
         }
         
         function hardDrop() {
-            if (!currentPiece || gameState !== GAME_STATE.PLAYING) return;
+            if (!currentPiece) return;
             while (isValidMove(currentPiece, { y: 1 })) {
                 currentPiece.userData.gridPos.y += 1;
             }
             updatePiecePosition(currentPiece);
-            const isClearing = lockPiece();
-            if (!isClearing && gameState === GAME_STATE.PLAYING) {
-                spawnPiece();
-                clearInterval(gameLoopInterval);
-                gameLoopInterval = setInterval(gameTick, currentDropSpeed);
-            }
+            lockPiece();
+            spawnPiece();
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(gameTick, currentDropSpeed); 
             triggerHaptic(20); 
         }
 
@@ -2002,7 +1997,7 @@
             }
             gameBoard.remove(currentPiece);
             currentPiece = null;
-            return checkLineClears();
+            checkLineClears();
         }
 
         function base64ToArrayBuffer(base64) {

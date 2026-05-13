@@ -9,8 +9,6 @@
     
     <!-- Load Google Font: Montserrat (Medium & Bold) -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <!-- Load Material Icons -->
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
         /* Basic reset */
@@ -154,8 +152,14 @@
             transform: scale(0.95);
         }
         
-        .control-btn .material-icons-round {
+        .ui-icon {
             font-size: 24px;
+            line-height: 1;
+            font-weight: 800;
+            font-family: Arial, Helvetica, sans-serif;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #music-toggle {
@@ -184,7 +188,7 @@
             100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
         }
         
-        #record-button .material-icons-round {
+        #record-button .ui-icon {
             color: white;
         }
 
@@ -506,7 +510,7 @@
 
     <!-- 5. Onboarding Message -->
     <div id="message-box" class="glass-panel">
-        <span class="material-icons-round phone-icon">smartphone</span>
+        <span class="ui-icon phone-icon" aria-hidden="true">▱</span>
         <span id="message-text">Scan floor to start</span>
     </div>
 
@@ -524,7 +528,7 @@
             </div>
         </div>
         <button id="replay-button">
-            <span class="material-icons-round" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;">replay</span>
+            <span class="ui-icon" style="vertical-align: middle; margin-right: 5px; font-size: 1.2rem;" aria-hidden="true">↻</span>
             Play Again
         </button>
     </div>
@@ -538,12 +542,12 @@
     <!-- 3. Consistent Icons -->
     <!-- Music Toggle -->
     <button id="music-toggle" class="control-btn" aria-label="Toggle Music">
-        <span class="material-icons-round" id="icon-music">volume_up</span>
+        <span class="ui-icon" id="icon-music" aria-hidden="true">♪</span>
     </button>
 
     <!-- Recording Button -->
     <button id="record-button" class="control-btn" aria-label="Record Video">
-        <span class="material-icons-round" id="icon-record-btn">fiber_manual_record</span>
+        <span class="ui-icon" id="icon-record-btn" aria-hidden="true">●</span>
     </button>
 
     <!-- Capability-gated launch panel -->
@@ -556,7 +560,7 @@
     </div>
 
     <button id="reset-ar-button" class="control-btn" aria-label="Reset / Recenter">
-        <span class="material-icons-round">my_location</span>
+        <span class="ui-icon" aria-hidden="true">◎</span>
     </button>
     
     <!-- Audio -->
@@ -1065,7 +1069,7 @@
             if (recordButton) recordButton.style.display = 'none';
             if (resetArButton) resetArButton.style.display = 'flex';
             if (!isMusicMuted) startBGM();
-            updateMessage('Mobile AR controls: tap left/right to move, tap middle to rotate, swipe down to hard drop', false);
+            updateMessage('Mobile AR controls: left tap = left, middle tap = rotate, right tap = right, swipe down = hard drop', false);
             runStartIntro();
         }
 
@@ -1124,7 +1128,7 @@
             
             // --- FIX: Record button elements defined inside init ---
             recordButton = document.getElementById('record-button');
-            iconRecord = document.getElementById('icon-record-btn'); // Uses material icons now
+            iconRecord = document.getElementById('icon-record-btn'); // Uses inline symbols to avoid icon-font text flash
             recordingPanel = document.getElementById('recording-panel');
             recTimer = document.getElementById('rec-time');
 
@@ -1192,11 +1196,13 @@
             let touchStartTime = 0;
             let touchActionCommitted = false;
             let lastTouchActionTime = 0;
+            let suppressControllerSelectUntil = 0;
             const TAP_MAX_DISTANCE = 28;
             const TAP_MAX_TIME_MS = 320;
             const HARD_DROP_SWIPE_Y = 70;
             const SWIPE_DIRECTION_RATIO = 1.25;
             const TOUCH_COOLDOWN_MS = 90;
+            const TOUCH_XR_SELECT_SUPPRESSION_MS = 700;
 
             function getTouchZone(x) {
                 const third = window.innerWidth / 3;
@@ -1214,6 +1220,13 @@
                 if (t - lastTouchActionTime < TOUCH_COOLDOWN_MS) return false;
                 lastTouchActionTime = t;
                 return true;
+            }
+
+            function suppressXRSelectFromScreenTouch() {
+                // In mobile WebXR AR, a screen tap can also emit an XR "select" event.
+                // That event used to rotate the piece after a left/right touch was released.
+                // Suppress only controller-select events that happen immediately after a screen touch.
+                suppressControllerSelectUntil = Date.now() + TOUCH_XR_SELECT_SUPPRESSION_MS;
             }
 
             function commitTouchAction(action) {
@@ -1241,6 +1254,7 @@
             function onTouchStart(e) {
                 if (!isGameplayTouchTarget(e.target)) return;
                 e.preventDefault();
+                suppressXRSelectFromScreenTouch();
 
                 if (gameState === GAME_STATE.PLACING) {
                     updateMessage("", false);
@@ -1340,12 +1354,15 @@
         
         // --- XR CONTROLLER EVENT HANDLER ---
         function onControllerSelect() {
-            // This handles the "Click" logic for the controllers
+            // Physical XR controller select is allowed. Mobile screen taps are handled by
+            // the touch-zone controls and must not rotate again on finger release.
+            if (Date.now() < suppressControllerSelectUntil) return;
+
             if (gameState === GAME_STATE.PLACING) {
                 updateMessage("", false); 
                 playIntroAndStart(); 
             } else if (gameState === GAME_STATE.PLAYING) {
-                rotatePiece(); // Trigger rotates in game
+                rotatePiece(); // Controller trigger rotates in game
             }
         }
 
@@ -1414,7 +1431,7 @@
 
         function resetRecordingUI() {
             if (recordButton) recordButton.classList.remove('recording');
-            if (iconRecord) iconRecord.textContent = "fiber_manual_record";
+            if (iconRecord) iconRecord.textContent = "●";
             if (recordingPanel) recordingPanel.style.display = 'none';
             if (recTimer) recTimer.textContent = "00:00";
         }
@@ -1459,7 +1476,7 @@
             isRecording = true;
             
             if (recordButton) recordButton.classList.add('recording');
-            if (iconRecord) iconRecord.textContent = "stop"; // Change material icon text to stop
+            if (iconRecord) iconRecord.textContent = "■"; // Change inline symbol to stop
             if (recordingPanel) recordingPanel.style.display = 'flex';
             
             // Start timer
@@ -1518,12 +1535,12 @@
             if (isMusicMuted) {
                 // Unmute/start BGM
                 startBGM();
-                musicIcon.textContent = "volume_up";
+                musicIcon.textContent = "♪";
                 isMusicMuted = false;
             } else {
                 // Mute/stop BGM
                 stopBGM();
-                musicIcon.textContent = "volume_off";
+                musicIcon.textContent = "×";
                 isMusicMuted = true;
             }
         }

@@ -1313,8 +1313,22 @@
                 const endY = touch ? touch.pageY : touchStartY;
                 const deltaX = endX - touchStartX;
                 const deltaY = endY - touchStartY;
+                const absX = Math.abs(deltaX);
+                const absY = Math.abs(deltaY);
                 const travel = Math.hypot(deltaX, deltaY);
                 const touchTime = Date.now() - touchStartTime;
+
+                // Final release check: some mobile AR browsers do not emit enough touchmove
+                // events during a fast top-to-bottom swipe. A downward swipe must always
+                // hard-drop all the way down, never soft-drop by one cell.
+                if (
+                    deltaY >= HARD_DROP_SWIPE_Y &&
+                    absY >= absX * SWIPE_DIRECTION_RATIO
+                ) {
+                    commitTouchAction('hardDrop');
+                    resetTouchState();
+                    return;
+                }
 
                 // Only taps trigger left/right/rotate. No release-rotate after side taps.
                 if (touchTime <= TAP_MAX_TIME_MS && travel <= TAP_MAX_DISTANCE) {

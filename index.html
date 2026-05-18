@@ -34,10 +34,6 @@
             touch-action: none;
         }
 
-        #default-ar-button {
-            display: none !important;
-            visibility: hidden !important;
-        }
 
         /* --- Shared Glassmorphism Style --- */
         .glass-panel {
@@ -87,8 +83,74 @@
             font-family: 'Montserrat', monospace; 
         }
         
+        #lines-val {
+            color: #FFFFFF;
+        }
+
         #level-val {
             color: #00FFFF; 
+        }
+
+        #next-panel {
+            position: absolute;
+            top: 20px;
+            right: 82px;
+            padding: 10px 12px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+            min-width: 74px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .next-label {
+            color: #00FFFF;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.45);
+        }
+
+        #next-preview {
+            width: 58px;
+            height: 58px;
+            position: relative;
+        }
+
+        .next-cell {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            background: var(--piece-color);
+            box-shadow:
+                0 0 8px var(--piece-color),
+                inset 0 0 5px rgba(255, 255, 255, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        @media (max-width: 420px) {
+            #next-panel {
+                top: 182px;
+                right: 20px;
+                min-width: 58px;
+                padding: 8px 9px 10px;
+            }
+
+            #next-preview {
+                width: 48px;
+                height: 48px;
+            }
+
+            .next-cell {
+                width: 10px;
+                height: 10px;
+                border-radius: 2px;
+            }
         }
 
         /* Feedback (Recording) */
@@ -115,12 +177,6 @@
             animation: blink-red 1s infinite;
         }
         
-        #recording-timer {
-            font-size: 0.8rem;
-            font-weight: 600;
-            font-variant-numeric: tabular-nums;
-            color: #FF4136;
-        }
 
         @keyframes blink-red {
             0% { opacity: 1; }
@@ -228,58 +284,20 @@
         }
 
         #custom-ar-button {
-            position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 16px 32px;
             border-radius: 50px;
             background: linear-gradient(135deg, #8a2be2, #4169e1);
             color: white;
             font-family: 'Montserrat', sans-serif;
-            font-size: 1.1rem; 
             font-weight: 700;
             border: none;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             cursor: pointer;
             z-index: 101;
             transition: transform 0.2s;
-            /* IMPORTANT: Ensure button pointer events are active */
             pointer-events: auto; 
             text-transform: uppercase;
             letter-spacing: 1px;
             animation: btn-pulse 2s infinite;
-        }
-
-        #custom-ar-button:active {
-            transform: translateX(-50%) scale(0.95);
-        }
-
-        /* --- Device Note Above Button --- */
-        #device-note {
-            position: absolute;
-            bottom: 150px; 
-            left: 50%;
-            transform: translateX(-50%);
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.55rem;
-            font-family: 'Montserrat', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            /* CRITICAL FIX: Ensure events pass through this static element to the button below */
-            pointer-events: none; 
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-            z-index: 101;
-            /* RETAINED STYLES FOR LINE BREAK */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            line-height: 1.2;
-        }
-        /* RETAINED STYLES FOR LINE BREAK */
-        #device-note span {
-            display: block;
-            margin-top: 2px; 
         }
 
 
@@ -340,11 +358,6 @@
             filter: grayscale(0.5);
         }
 
-        #fallback-3d-button {
-            display: none;
-            background: linear-gradient(135deg, #2ecc71, #1f8f4d);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.28);
-        }
 
         #custom-ar-button {
             position: static;
@@ -497,9 +510,18 @@
             <span class="hud-value" id="score-val">0</span>
         </div>
         <div class="hud-row">
+            <span class="hud-label">Lines</span>
+            <span class="hud-value" id="lines-val">0</span>
+        </div>
+        <div class="hud-row">
             <span class="hud-label">Level</span>
             <span class="hud-value" id="level-val">1</span>
         </div>
+    </div>
+
+    <div id="next-panel" class="glass-panel" aria-live="polite">
+        <div class="next-label">Next</div>
+        <div id="next-preview" aria-label="Next Tetris piece"></div>
     </div>
 
     <!-- 2. Feedback (Recording Timer) -->
@@ -553,7 +575,7 @@
     <!-- Capability-gated launch panel -->
     <div id="launch-panel" class="glass-panel">
         <div id="launch-status">Checking AR support...</div>
-        <div id="launch-details">This build is mobile AR only. Open it on a supported Android ARCore phone in Chrome over HTTPS.</div>
+        <div id="launch-details">Open on a supported WebXR AR browser or headset browser over HTTPS. The Start AR button appears only when immersive AR is available.</div>
         <div id="launch-actions">
             <button id="custom-ar-button" class="launch-btn" disabled>CHECKING AR</button>
         </div>
@@ -564,9 +586,7 @@
     </button>
     
     <!-- Audio -->
-    <audio id="audio-tts" preload="auto" playsinline></audio>
-    
-    <!-- RE-INTRODUCED PLACEHOLDER AUDIO ELEMENT -->
+    <!-- Audio elements -->
     <audio id="audio-bgm" src="music/music.mp3" loop preload="auto" playsinline></audio>
     <audio id="audio-move" src="music/tik.mp3" preload="auto" playsinline></audio>
     <audio id="audio-gameover" src="music/outro.mp3" preload="auto" playsinline></audio>
@@ -575,8 +595,7 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"
             }
         }
     </script>
@@ -599,13 +618,13 @@
         const capabilityStatus = { secure: false, webgl: false, xr: false, immersiveAR: false, camera: 'unknown', supportsAR: false };
         
         // UI Vars
-        let customArButton, fallback3DButton, resetArButton, launchPanel, launchStatus, launchDetails;
-        let messageBox, messageText, phoneIcon, deviceNote;
-        let hudPanel, scoreVal, levelVal;
+        let customArButton, resetArButton, launchPanel, launchStatus, launchDetails;
+        let messageBox, messageText, phoneIcon;
+        let hudPanel, scoreVal, linesVal, levelVal, nextPanel, nextPreview;
         let gameOverCard, goScore, goLevel, replayButton;
         let musicToggleBtn, musicIcon;
         // FIXED: Globally declare record vars
-        let recordButton, iconRecord, recordingIndicator;
+        let recordButton, iconRecord;
         let recordingPanel, recTimer;
         
         let mediaRecorder;
@@ -628,7 +647,12 @@
         };
         let gameState = GAME_STATE.INITIALIZING;
         let startInProgress = false;
+        let startSequenceId = 0;
+        let introTimers = [];
+        let lineClearInProgress = false;
+        let lineClearSequenceId = 0;
         let score = 0;
+        let nextTypeIndex = null;
         
         // --- Level Variables ---
         let level = 1;
@@ -677,24 +701,20 @@
 
         let moveSound, gameOverSound, lineClearSound;
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let audioUnlocked = false;
         let isMusicMuted = false; 
         let blueGridMat, greenGridMat;
         
         // BGM Specific HTML Audio Element
         let bgmElement; 
 
-        // Controller Logic Variables
-        const controllerData = {
-            left: { axisX: 0, axisY: 0, isSelecting: false, isSqueezing: false },
-            right: { axisX: 0, axisY: 0, isSelecting: false, isSqueezing: false }
-        };
-        // Debounce/Cooldowns for joystick movement
+        // Debounce/Cooldowns for joystick/controller movement
         let lastMoveTime = 0;
         let lastRotateTime = 0;
+        let lastXRPlaceAttemptTime = 0;
         const JOYSTICK_MOVE_DELAY = 150; // ms between moves when holding stick
         const JOYSTICK_ROTATE_DELAY = 250; 
         const JOYSTICK_DEADZONE = 0.3;
+        const XR_PLACE_COOLDOWN_MS = 350;
 
         function triggerHaptic(duration = 20) {
             // Mobile Haptic
@@ -716,7 +736,7 @@
             if (bgmElement) {
                 bgmElement.volume = 0.05; // Low gain (5%)
                 if (bgmElement.paused) {
-                    bgmElement.play().catch(e => console.warn("BGM play failed (placeholder link)", e));
+                    bgmElement.play().catch(e => console.warn("BGM play failed", e));
                 }
             }
         }
@@ -802,15 +822,7 @@
             }
         }
 
-        function isLikelyMobilePhoneOrTablet() {
-            const uaMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-            const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-            const smallViewport = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 900;
-            return uaMobile || (coarsePointer && smallViewport);
-        }
-
         async function runCapabilityChecks() {
-            const mobileCandidate = isLikelyMobilePhoneOrTablet();
             capabilityStatus.secure = window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
             capabilityStatus.webgl = checkWebGLSupport();
             capabilityStatus.xr = !!navigator.xr;
@@ -818,25 +830,20 @@
             capabilityStatus.immersiveAR = false;
             capabilityStatus.supportsAR = false;
 
-            if (!mobileCandidate) {
+            if (!capabilityStatus.secure) {
                 setLaunchStatus(
-                    'Mobile AR only',
-                    'This version is designed for supported mobile AR phones. Open this link on Android Chrome with ARCore over HTTPS. Desktop/laptop keyboard and 3D fallback modes are intentionally disabled.'
-                );
-            } else if (!capabilityStatus.secure) {
-                setLaunchStatus(
-                    'HTTPS required for mobile AR',
-                    'Serve this game from HTTPS, then open it on a supported Android ARCore phone in Chrome. Localhost is acceptable only for development testing.'
+                    'HTTPS required for AR',
+                    'Serve this game from HTTPS, then open it in a supported WebXR AR browser or headset browser. Localhost is acceptable only for development testing.'
                 );
             } else if (!capabilityStatus.webgl) {
                 setLaunchStatus(
                     'WebGL is unavailable',
-                    'This mobile browser cannot render the AR game. Try a supported Android phone with Chrome and ARCore.'
+                    'This browser cannot render the AR game. Try a supported WebXR AR browser or headset browser.'
                 );
             } else if (!capabilityStatus.xr) {
                 setLaunchStatus(
-                    'Mobile WebXR AR unavailable',
-                    'This browser does not expose navigator.xr. Open on supported Android Chrome with ARCore. This build does not include desktop or 3D fallback gameplay.'
+                    'WebXR unavailable',
+                    'This browser does not expose navigator.xr. Open the game in a browser/headset browser that supports WebXR immersive-ar.'
                 );
             } else {
                 try {
@@ -848,21 +855,18 @@
 
                 if (capabilityStatus.immersiveAR) {
                     capabilityStatus.supportsAR = true;
-                    setLaunchStatus('AR ready', `Camera permission: ${capabilityStatus.camera}. Tap Start AR and scan a floor.`);
+                    setLaunchStatus('AR ready', `Camera permission: ${capabilityStatus.camera}. Tap Start AR and scan a floor or supported tracked surface.`);
                 } else {
                     setLaunchStatus(
-                        'Mobile AR not supported here',
-                        'This phone/browser does not support WebXR immersive-ar. This build is mobile AR only and does not include desktop, keyboard, or non-AR fallback gameplay.'
+                        'WebXR AR not supported here',
+                        'This browser/device did not report immersive-ar support. The game is not blocked by mobile-only checks, but AR launch still requires WebXR immersive-ar support.'
                     );
                 }
             }
 
             if (customArButton) {
                 customArButton.disabled = !capabilityStatus.supportsAR;
-                customArButton.textContent = capabilityStatus.supportsAR ? 'START AR' : 'MOBILE AR ONLY';
-            }
-            if (fallback3DButton) {
-                fallback3DButton.style.display = 'none';
+                customArButton.textContent = capabilityStatus.supportsAR ? 'START AR' : 'AR REQUIRED';
             }
         }
 
@@ -885,7 +889,6 @@
                     }
                 } catch (e) {}
             });
-            audioUnlocked = true;
         }
 
         function preloadAudioStatus() {
@@ -911,7 +914,7 @@
         async function startARSession() {
             await runCapabilityChecks();
             if (!capabilityStatus.supportsAR) {
-                setLaunchStatus('AR launch blocked by capability check', 'This build is mobile AR only. Open it on a supported Android ARCore phone in Chrome over HTTPS.');
+                setLaunchStatus('AR launch blocked by capability check', 'This browser/device did not pass the WebXR immersive-ar capability check. Open it in a supported WebXR AR browser or headset browser over HTTPS.');
                 return;
             }
 
@@ -968,6 +971,9 @@
             if (launchPanel) launchPanel.style.display = 'none';
             if (recordButton) recordButton.style.display = 'flex';
             if (resetArButton) resetArButton.style.display = 'flex';
+            invalidateStartSequence();
+            cleanupActivePieces();
+            invalidateLineClear();
             gameState = GAME_STATE.SCANNING;
             updateMessage('Scan floor to start', true);
 
@@ -981,6 +987,7 @@
         }
 
         function onXRSessionEnded() {
+            invalidateStartSequence();
             stopBGM();
             if (isRecording) stopRecording();
             if (hitTestSource && typeof hitTestSource.cancel === 'function') hitTestSource.cancel();
@@ -1001,7 +1008,8 @@
             if (gameBoard) scene.remove(gameBoard);
             gameBoard = new THREE.Group();
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
-            currentPiece = null;
+            cleanupActivePieces();
+            invalidateLineClear();
             score = 0;
             level = 1;
             linesClearedTotal = 0;
@@ -1030,32 +1038,78 @@
             }
         }
 
+        function clearIntroTimers() {
+            introTimers.forEach(timerId => clearTimeout(timerId));
+            introTimers = [];
+        }
+
+        function invalidateStartSequence() {
+            startSequenceId++;
+            startInProgress = false;
+            clearIntroTimers();
+            if (introScreen) {
+                introScreen.style.opacity = '0';
+                introScreen.style.display = 'none';
+            }
+        }
+
+        function invalidateLineClear() {
+            lineClearSequenceId++;
+            lineClearInProgress = false;
+        }
+
+        function cleanupActivePieces() {
+            if (!gameBoard) return;
+            for (let i = gameBoard.children.length - 1; i >= 0; i--) {
+                const child = gameBoard.children[i];
+                const looksLikeFallingPiece = child.userData && (
+                    child.userData.isActivePiece ||
+                    (child.userData.shape && child.userData.gridPos)
+                );
+                if (child === currentPiece || looksLikeFallingPiece) {
+                    gameBoard.remove(child);
+                }
+            }
+            currentPiece = null;
+        }
+
         function runStartIntro() {
-            if (startInProgress || gameState === GAME_STATE.PLAYING) return;
+            if (startInProgress || gameState === GAME_STATE.STARTING || gameState === GAME_STATE.PLAYING) return;
+            clearIntroTimers();
+            const sequenceId = ++startSequenceId;
             startInProgress = true;
             gameState = GAME_STATE.STARTING;
             clearInterval(gameLoopInterval);
             gameLoopInterval = null;
+            lineClearInProgress = false;
             placementGrid.visible = false;
+            cleanupActivePieces();
             introScreen.style.display = 'flex';
-            setTimeout(() => { introScreen.style.opacity = '1'; }, 50);
-            setTimeout(() => {
+            introTimers.push(setTimeout(() => {
+                if (sequenceId !== startSequenceId || gameState !== GAME_STATE.STARTING) return;
+                introScreen.style.opacity = '1';
+            }, 50));
+            introTimers.push(setTimeout(() => {
+                if (sequenceId !== startSequenceId || gameState !== GAME_STATE.STARTING) return;
                 introScreen.style.opacity = '0';
-                setTimeout(() => {
+                introTimers.push(setTimeout(() => {
+                    if (sequenceId !== startSequenceId || gameState !== GAME_STATE.STARTING) return;
                     introScreen.style.display = 'none';
-                    startGame();
-                }, 500);
-            }, 1200);
+                    startGame(sequenceId);
+                }, 500));
+            }, 1200));
         }
 
         function startFallback3D() {
+            invalidateStartSequence();
             fallbackMode = true;
             clearInterval(gameLoopInterval);
             gameLoopInterval = null;
             if (gameBoard) scene.remove(gameBoard);
             gameBoard = new THREE.Group();
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
-            currentPiece = null;
+            cleanupActivePieces();
+            invalidateLineClear();
             score = 0;
             level = 1;
             linesClearedTotal = 0;
@@ -1069,7 +1123,7 @@
             if (recordButton) recordButton.style.display = 'none';
             if (resetArButton) resetArButton.style.display = 'flex';
             if (!isMusicMuted) startBGM();
-            updateMessage('Mobile AR controls: left tap = left, middle tap = rotate, right tap = right, swipe down = hard drop', false);
+            updateMessage('AR controls: left tap = left, middle tap = rotate, right tap = right, swipe down = hard drop', false);
             runStartIntro();
         }
 
@@ -1093,20 +1147,24 @@
             // --- XR CONTROLLER SETUP ---
             controller1 = renderer.xr.getController(0);
             controller1.addEventListener('select', onControllerSelect);
+            controller1.addEventListener('selectstart', onControllerSelect);
+            controller1.addEventListener('squeeze', onControllerSelect);
+            controller1.addEventListener('squeezestart', onControllerSelect);
             scene.add(controller1);
 
             controller2 = renderer.xr.getController(1);
             controller2.addEventListener('select', onControllerSelect);
+            controller2.addEventListener('selectstart', onControllerSelect);
+            controller2.addEventListener('squeeze', onControllerSelect);
+            controller2.addEventListener('squeezestart', onControllerSelect);
             scene.add(controller2);
 
             // Bind UI Elements
             customArButton = document.getElementById('custom-ar-button');
-            fallback3DButton = document.getElementById('fallback-3d-button');
             resetArButton = document.getElementById('reset-ar-button');
             launchPanel = document.getElementById('launch-panel');
             launchStatus = document.getElementById('launch-status');
             launchDetails = document.getElementById('launch-details');
-            deviceNote = document.getElementById('device-note');
             
             messageBox = document.getElementById('message-box');
             messageText = document.getElementById('message-text');
@@ -1114,7 +1172,10 @@
             
             hudPanel = document.getElementById('hud-panel');
             scoreVal = document.getElementById('score-val');
+            linesVal = document.getElementById('lines-val');
             levelVal = document.getElementById('level-val');
+            nextPanel = document.getElementById('next-panel');
+            nextPreview = document.getElementById('next-preview');
             
             gameOverCard = document.getElementById('game-over-card');
             goScore = document.getElementById('go-score');
@@ -1139,14 +1200,11 @@
             gameOverSound = document.getElementById('audio-gameover');
             lineClearSound = document.getElementById('audio-lineclear');
 
-            // Strict capability-gated launch. Do not expose AR launch until immersive-ar is confirmed.
+            // Capability-gated launch. Do not expose AR launch until immersive-ar is confirmed; do not block headset browsers with mobile-only checks.
             customArButton.addEventListener('click', async () => {
                 await startARSession();
             });
 
-            if (fallback3DButton) {
-                fallback3DButton.style.display = 'none';
-            }
 
             resetArButton.addEventListener('click', () => {
                 triggerHaptic(10);
@@ -1185,7 +1243,7 @@
             runCapabilityChecks();
             preloadAudioStatus();
 
-            // Touch Controls (Mobile AR gameplay)
+            // Touch Controls (AR gameplay)
             // Contract:
             // - Tap left third: move left only.
             // - Tap right third: move right only.
@@ -1223,7 +1281,7 @@
             }
 
             function suppressXRSelectFromScreenTouch() {
-                // In mobile WebXR AR, a screen tap can also emit an XR "select" event.
+                // In WebXR AR, a screen tap can also emit an XR "select" event.
                 // That event used to rotate the piece after a left/right touch was released.
                 // Suppress only controller-select events that happen immediately after a screen touch.
                 suppressControllerSelectUntil = Date.now() + TOUCH_XR_SELECT_SUPPRESSION_MS;
@@ -1318,7 +1376,7 @@
                 const travel = Math.hypot(deltaX, deltaY);
                 const touchTime = Date.now() - touchStartTime;
 
-                // Final release check: some mobile AR browsers do not emit enough touchmove
+                // Final release check: some AR browsers do not emit enough touchmove
                 // events during a fast top-to-bottom swipe. A downward swipe must always
                 // hard-drop all the way down, never soft-drop by one cell.
                 if (
@@ -1366,21 +1424,41 @@
             renderer.setAnimationLoop(animate);
         }
         
+        function tryLockGroundFromXRController() {
+            const now = Date.now();
+            if (now - lastXRPlaceAttemptTime < XR_PLACE_COOLDOWN_MS) return;
+            lastXRPlaceAttemptTime = now;
+
+            if (gameState === GAME_STATE.PLACING && placementGrid && placementGrid.visible) {
+                updateMessage("", false);
+                playIntroAndStart();
+            } else if (gameState === GAME_STATE.SCANNING) {
+                updateMessage("Keep scanning until the floor reticle appears", true);
+            }
+        }
+
+        function isXRPlaceButtonPressed(gamepad) {
+            if (!gamepad || !gamepad.buttons) return false;
+            // Quest Browser mappings can differ between trigger/select events and raw gamepad buttons.
+            // Accept trigger, grip/squeeze, and face buttons as placement confirmation.
+            const candidateButtons = [0, 1, 3, 4, 5];
+            return candidateButtons.some(index => gamepad.buttons[index] && gamepad.buttons[index].pressed);
+        }
+
         // --- XR CONTROLLER EVENT HANDLER ---
         function onControllerSelect() {
-            // Physical XR controller select is allowed. Mobile screen taps are handled by
+            // Physical XR controller select is allowed. Screen taps are handled by
             // the touch-zone controls and must not rotate again on finger release.
             if (Date.now() < suppressControllerSelectUntil) return;
 
-            if (gameState === GAME_STATE.PLACING) {
-                updateMessage("", false); 
-                playIntroAndStart(); 
+            if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
+                tryLockGroundFromXRController();
             } else if (gameState === GAME_STATE.PLAYING) {
                 rotatePiece(); // Controller trigger rotates in game
             }
         }
 
-        // --- XR INPUT POLLING (JOYSTICKS) ---
+        // --- XR INPUT POLLING (JOYSTICKS + QUEST BUTTON FALLBACKS) ---
         function pollControllers() {
             const session = renderer.xr.getSession();
             if (!session) return;
@@ -1389,8 +1467,16 @@
 
             for (const source of session.inputSources) {
                 if (source.gamepad) {
-                    if (!currentPiece || gameState !== GAME_STATE.PLAYING) continue;
                     const gamepad = source.gamepad;
+
+                    if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING) {
+                        if (isXRPlaceButtonPressed(gamepad)) {
+                            tryLockGroundFromXRController();
+                        }
+                        continue;
+                    }
+
+                    if (!currentPiece || gameState !== GAME_STATE.PLAYING) continue;
                     
                     // Standard WebXR Gamepad Mapping
                     // axes[2] = Thumbstick X, axes[3] = Thumbstick Y
@@ -1569,8 +1655,8 @@
             if (frame) {
                 const session = renderer.xr.getSession();
                 
-                // --- UPDATE VR CONTROLS ---
-                if (gameState === GAME_STATE.PLAYING) {
+                // --- UPDATE XR CONTROLS ---
+                if (gameState === GAME_STATE.SCANNING || gameState === GAME_STATE.PLACING || gameState === GAME_STATE.PLAYING) {
                     pollControllers();
                 }
 
@@ -1670,22 +1756,27 @@
             runStartIntro();
         }
 
-        function startGame() {
+        function startGame(sequenceId = startSequenceId) {
             clearInterval(gameLoopInterval);
             gameLoopInterval = null;
 
-            // Defensive cleanup: if any earlier duplicate intro/start created an active piece,
-            // remove it before spawning the real first playable piece. This prevents the
-            // visible orphan block group that looked stuck at the top of the board.
-            if (currentPiece) {
-                gameBoard.remove(currentPiece);
-                currentPiece = null;
-            }
+            if (sequenceId !== startSequenceId || gameState !== GAME_STATE.STARTING) return;
+
+            // Defensive cleanup: remove every active falling group, not only currentPiece.
+            // This prevents delayed starts or duplicate events from leaving an orphan piece
+            // stuck at the spawn/top area.
+            cleanupActivePieces();
+            invalidateLineClear();
+            clearIntroTimers();
+            introScreen.style.opacity = '0';
+            introScreen.style.display = 'none';
 
             startInProgress = false;
             gameState = GAME_STATE.PLAYING;
             hudPanel.style.opacity = '1';
+            if (nextPanel) nextPanel.style.opacity = '1';
             if (resetArButton) resetArButton.style.display = 'flex';
+            nextTypeIndex = null;
             updateScore(0);
             
             placementGrid.visible = false;
@@ -1697,7 +1788,7 @@
 
         function gameTick() {
             // FIXED: STRICT CHECK TO STOP TICK IF GAME OVER
-            if (gameState !== GAME_STATE.PLAYING) return;
+            if (gameState !== GAME_STATE.PLAYING || lineClearInProgress) return;
 
             if (!currentPiece) return;
             if (isValidMove(currentPiece, { y: 1 })) {
@@ -1717,11 +1808,9 @@
             goLevel.textContent = level;
             gameOverCard.style.display = 'flex';
 
-            // FIXED: Ensure the current piece is removed/nullified immediately upon Game Over logic starting
-            if (currentPiece) {
-                gameBoard.remove(currentPiece);
-            }
-            currentPiece = null; 
+            // Remove any active falling group immediately on Game Over.
+            cleanupActivePieces();
+            invalidateLineClear();
             
             stopBGM();
             playSound(gameOverSound);
@@ -1729,6 +1818,7 @@
 
         // 7. Reset game: Go back to scanning
         function resetGame() {
+            invalidateStartSequence();
             // FIXED: STOP OUTRO MUSIC IMMEDIATELY
             if (gameOverSound) {
                 gameOverSound.pause();
@@ -1745,14 +1835,19 @@
             scene.remove(gameBoard); 
             gameBoard = new THREE.Group(); 
 
+            cleanupActivePieces();
+            invalidateLineClear();
             grid = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0));
             score = 0;
             linesClearedTotal = 0;
             level = 1;
             currentDropSpeed = 500;
+            nextTypeIndex = null;
+            renderNextPreview();
             
             // Hide HUD
             hudPanel.style.opacity = '0';
+            if (nextPanel) nextPanel.style.opacity = '0';
 
             // Restart BGM if not muted
             if (!isMusicMuted) {
@@ -1801,6 +1896,7 @@
                 setTimeout(() => document.body.removeChild(flash), 100);
             }
             scoreVal.textContent = score;
+            if (linesVal) linesVal.textContent = linesClearedTotal;
             levelVal.textContent = level;
         }
         
@@ -1816,6 +1912,8 @@
             
             if (linesCleared > 0) {
                 // 4. Slow Animation (Pause Game)
+                lineClearInProgress = true;
+                const clearSequenceId = ++lineClearSequenceId;
                 clearInterval(gameLoopInterval);
 
                 const blocksToAnimate = [];
@@ -1835,6 +1933,11 @@
                 let lastTimestamp = performance.now(); // Use performance.now() for precise timing
 
                 function animateClear(timestamp) {
+                    if (clearSequenceId !== lineClearSequenceId || gameState !== GAME_STATE.PLAYING) {
+                        lineClearInProgress = false;
+                        return;
+                    }
+
                     // Use time elapsed since last frame instead of relying purely on frame count
                     const deltaTime = timestamp - lastTimestamp;
                     lastTimestamp = timestamp;
@@ -1845,7 +1948,6 @@
                     if (progress < 1) {
                         blocksToAnimate.forEach(b => {
                             // Spin & Shrink (rotation speed adjusted to complete in 1 second)
-                            const rotationFactor = 0.01; // Base rotation factor
                             b.scale.setScalar(1 - progress);
                             
                             // The large rotation value ensures fast spin, compensating for low/variable frame rates
@@ -1882,6 +1984,7 @@
                         });
                         
                         updateScore(linesCleared);
+                        lineClearInProgress = false;
                         
                         // Spawn the next piece only after the line-clear animation has fully finished.
                         // This prevents a new active piece from sitting at the top while old rows animate.
@@ -1919,17 +2022,47 @@
             );
         }
 
+        function renderNextPreview() {
+            if (!nextPreview) return;
+            nextPreview.innerHTML = '';
+            if (nextTypeIndex === null) return;
+
+            const shape = SHAPES[nextTypeIndex][0];
+            const color = `#${COLORS[nextTypeIndex + 1].toString(16).padStart(6, '0')}`;
+            const cellSize = window.innerWidth <= 420 ? 11 : 13;
+            const shapeWidth = shape[0].length;
+            const shapeHeight = shape.length;
+            const offsetX = (nextPreview.clientWidth - shapeWidth * cellSize) / 2;
+            const offsetY = (nextPreview.clientHeight - shapeHeight * cellSize) / 2;
+
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (!shape[y][x]) continue;
+                    const cell = document.createElement('span');
+                    cell.className = 'next-cell';
+                    cell.style.setProperty('--piece-color', color);
+                    cell.style.left = `${offsetX + x * cellSize}px`;
+                    cell.style.top = `${offsetY + y * cellSize}px`;
+                    nextPreview.appendChild(cell);
+                }
+            }
+        }
+
         function spawnPiece() {
             // Only one active piece may exist. If a bad re-entry or duplicate call tries to spawn
             // while another active piece exists, remove the old active group first instead of
             // leaving it orphaned at the spawn/top area.
-            if (gameState !== GAME_STATE.PLAYING) return;
-            if (currentPiece) {
-                gameBoard.remove(currentPiece);
-                currentPiece = null;
+            if (gameState !== GAME_STATE.PLAYING || lineClearInProgress) return;
+            cleanupActivePieces();
+
+            if (nextTypeIndex === null) {
+                nextTypeIndex = Math.floor(Math.random() * SHAPES.length);
             }
 
-            const typeIndex = Math.floor(Math.random() * SHAPES.length);
+            const typeIndex = nextTypeIndex;
+            nextTypeIndex = Math.floor(Math.random() * SHAPES.length);
+            renderNextPreview();
+
             const rotationIndex = 0; 
             const shape = SHAPES[typeIndex][rotationIndex];
             
@@ -1958,7 +2091,13 @@
             const colorIndex = typeIndex + 1;
             
             const piece = new THREE.Group();
-            piece.userData = { shape: shape, typeIndex: typeIndex, rotationIndex: rotationIndex, gridPos: { x: Math.floor((BOARD_WIDTH - shape[0].length) / 2), y: 0 } };
+            piece.userData = {
+                isActivePiece: true,
+                shape: shape,
+                typeIndex: typeIndex,
+                rotationIndex: rotationIndex,
+                gridPos: { x: Math.floor((BOARD_WIDTH - shape[0].length) / 2), y: 0 }
+            };
             
             for (let y = 0; y < shape.length; y++) {
                 for (let x = 0; x < shape[y].length; x++) {
@@ -2009,7 +2148,7 @@
         }
         
         function hardDrop() {
-            if (!currentPiece || gameState !== GAME_STATE.PLAYING) return;
+            if (!currentPiece || gameState !== GAME_STATE.PLAYING || lineClearInProgress) return;
             while (isValidMove(currentPiece, { y: 1 })) {
                 currentPiece.userData.gridPos.y += 1;
             }
@@ -2046,6 +2185,7 @@
         function lockPiece() {
             if (!currentPiece) return;
             const ud = currentPiece.userData;
+            currentPiece.userData.isActivePiece = false;
             const shape = ud.shape;
             const gridX = ud.gridPos.x;
             const gridY = ud.gridPos.y; 
@@ -2073,41 +2213,5 @@
             return checkLineClears();
         }
 
-        function base64ToArrayBuffer(base64) {
-            const binaryString = window.atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-            return bytes.buffer;
-        }
-
-        function pcmToWav(pcmData, sampleRate) {
-            const numChannels = 1;
-            const bitsPerSample = 16;
-            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-            const blockAlign = numChannels * bitsPerSample / 8;
-            const dataSize = pcmData.length * 2; 
-            const buffer = new ArrayBuffer(44 + dataSize);
-            const view = new DataView(buffer);
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + dataSize, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true); 
-            view.setUint16(20, 1, true); 
-            view.setUint16(22, numChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, bitsPerSample, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, dataSize, true);
-            for (let i = 0; i < pcmData.length; i++) view.setInt16(44 + i * 2, pcmData[i], true);
-            return new Blob([view], { type: 'audio/wav' });
-        }
-
-        function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
-        }
     </script></body>
 </html>
